@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# content and dir
+/Main_Folder/Notebooks/
+/Main_Folder/Results/
+/Main_Folder/Modules/dataset/
+
+
 # Distribution / packaging
 .Python
 build/
