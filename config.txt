@@ -1,0 +1,8 @@
+[folder_path]
+IMAGES = Results/ImgRes
+TEXT_FILE = Results/CSVRes
+DATASET = Modules/dataset
+# path to save or load data
+
+[dataset]
+FIRE = https://projects.ics.forth.gr/cvrl/fire/FIRE.7z

@@ -1,0 +1,54 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools >= 64"]
+
+[project]
+authors = [
+    {name = "Renato Eliasy", email = "renatoeliasy@gmail.com"},
+]
+dependencies = [
+    "requests==2.32.3",
+    "responses==0.25.3",
+    "matplotlib==3.9.2",
+    "numpy==1.26.4",
+    "pandas==2.2.2",
+    "torch==2.4.1",
+    "rich==13.3.5",
+    "scipy==1.13.1",
+    "seaborn==0.13.2",
+    "torchdiffeq==0.2.4",
+    "torchinfo==1.8.0",
+    "torchaudio==2.4.1",
+    "torchvision==0.19.1",
+    "pillow==10.4.0",
+]
+description = "A project to investigate the use of ODEs in image registration."
+dynamic = ["version"]
+license = {file = "LICENSE"}
+name = "ImgRegODE"
+readme = "README.md"
+requires-python = "== 3.12.3"
+
+[project.scripts]
+ImgRegODE = "Main_Folder.Main_Code.__main__:main"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["Main_Folder"]
+
+
+
+# mypy per-module options:
+[[tool.mypy.overrides]]
+module = [
+    "requests",
+    "seaborn",
+    "scipy.stats",
+    "py7zip",
+]
+ignore_missing_imports = true
