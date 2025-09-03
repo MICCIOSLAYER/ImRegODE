@@ -1,0 +1,3 @@
+[submodule "Main_Folder/external_resources/Airlab_repo"]
+	path = Main_Folder/external_resources/Airlab_repo
+	url = https://github.com/airlab-unibas/airlab.git
