@@ -1,3 +1,9 @@
 {
-    "editor.acceptSuggestionOnEnter": "on"
+  "editor.acceptSuggestionOnEnter": "on",
+
+  "python.defaultInterpreterPath": "C:\\Users\\gioco\\anaconda3\\envs\\ImgReg_project\\python.exe",
+  "python.analysis.extraPaths": [
+    "C:\\Users\\gioco\\Desktop\\UNIBORK\\TESI_MAGISTRALE\\REPOSITORIES\\Airlab\\airlab"
+  ],
+  "python.languageServer": "Pylance"
 }
