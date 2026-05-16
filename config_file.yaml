@@ -1,0 +1,131 @@
+constant:
+  num-like:
+    HIGHEDGE_BOX: 0.8333333333333334
+    LOWEDGE_BOX: 0.16666666666666666
+    n_iteration: 500
+    sample_size: 2
+    
+  path-like:
+    CONTROL_POINTS_FOLDER:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Ground Truth
+    CSV_RESULTS:
+    - Main_Folder
+    - Results
+    - CSVResults
+    DATA_COLLECTORS:
+    - Main_Folder
+    - Results
+    - DataCollectors
+    ELASTIX_IMAGE_FOLDER:
+    - Main_folder
+    - Results
+    - ITK-Elastix
+    FIRE_DATASET:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    IMAGES:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    IMAGE_MASK:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Mask
+    IMG_RESULTS:
+    - Main_Folder
+    - Results
+    - ImgRes
+    Images_A:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    - Longitudinal_Studies
+    Images_P:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    - Mosaicing
+    Images_S:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    - Super_Resolution
+    RESULTS:
+    - Main_Folder
+    - Results
+  text-like:
+    FIXED: _1
+    MOVING: _2
+    REFERENCE_FOLDER: Reference
+    TEST_FOLDER: Test
+registrations:
+  DRMINE_original:
+    crop_style: ''
+    early_stopping_criteria: ''
+    histo_bins: 64
+    lr:
+      mine: 0.01
+      v1: 1.0e-05
+      vL: 0.001
+    min_delta: .inf
+    n_iterations: 500
+    pyramid_levels: 6
+    sampling_ratio: 0.1
+    n_neurons: 100
+  Personal:
+    TO BE DEFINED: null
+  airlab:
+    background_values: false
+    histo_bins: 64
+    lr: 0.0001
+    masked: false
+    metric_sigma: 3.0
+    n_iterations: 5000
+    sampling_ratio: 0.1
+  elastix_original:
+    histo_bins: 64
+    n_iterations: 5000
+    n_resolution: 4
+  simpleITK_original:
+    JHMI:
+      convergenceMinimumValue: 1.0e-09
+      convergenceWindowSize: 200
+      histo_bins: 100
+      lr: 0.1
+      n_iterations: 5000
+      sampling_ratio: 0.5
+    MMI:
+      convergenceMinimumValue: 1.0e-09
+      convergenceWindowSize: 200
+      histo_bins: 100
+      lr: 1.0e-05
+      n_iterations: 5000
+      sampling_ratio: 0.5
+    MSE:
+      convergenceMinimumValue: 1.0e-09
+      convergenceWindowSize: 200
+      lr: 1.0e-06
+      n_iterations: 5000
+      sampling_ratio: 0.5
+    NCC:
+      convergenceMinimumValue: 1.0e-09
+      convergenceWindowSize: 200
+      lr: 0.1
+      n_iterations: 5000
+      sampling_ratio: 0.5
