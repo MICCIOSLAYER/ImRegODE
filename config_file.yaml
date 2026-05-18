@@ -2,9 +2,9 @@ constant:
   num-like:
     HIGHEDGE_BOX: 0.8333333333333334
     LOWEDGE_BOX: 0.16666666666666666
-    n_iteration: 500
+    n_iterations: 500
     sample_size: 2
-    
+
   path-like:
     CONTROL_POINTS_FOLDER:
     - Main_folder
