@@ -36,6 +36,20 @@ constant:
     - dataset
     - FIRE
     - Images
+    FIRE_TEST_FOLDER:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    - Test
+    FIRE_REFERENCE_FOLDER:
+    - Main_folder
+    - Modules
+    - dataset
+    - FIRE
+    - Images
+    - Reference
     IMAGE_MASK:
     - Main_folder
     - Modules
