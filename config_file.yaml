@@ -90,6 +90,7 @@ constant:
     REFERENCE_FOLDER: Reference
     TEST_FOLDER: Test
     SAVING_FORMAT: csv
+    img_normalization: same
 registrations:
   DRMINE_original:
     crop_style: ''
@@ -107,10 +108,15 @@ registrations:
   Personal:
     TO BE DEFINED: null
   airlab:
-    background_values: false
+    early-stopping:
+      patience: 30
+      min_delta: 1e-7
+    masked: false
+    background_min: 0.0
+    background_max: 0.0
+    opt_cm: False
     histo_bins: 64
     lr: 0.0001
-    masked: false
     metric_sigma: 3.0
     n_iterations: 500
     sampling_ratio: 0.1
