@@ -5,6 +5,11 @@ constant:
     n_iterations: 500
     max_sample: 2
     batch_size: 1
+    crop_dict:
+      area_ratio: 0.5
+      final_height: 200
+      final_width: 100
+      
 
   path-like:
     CONTROL_POINTS_FOLDER:
