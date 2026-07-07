@@ -111,7 +111,6 @@ registrations:
       vL: 0.001
     min_delta: .inf
     n_iterations: 500
-    pyramid_levels: 6
     sampling_ratio: 0.1
     n_neurons: 100
   Personal:
