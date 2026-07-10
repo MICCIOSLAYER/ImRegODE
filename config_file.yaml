@@ -98,6 +98,8 @@ constant:
     img_normalization: same
 registrations:
   DRMINE_original:
+    MINE : 
+      nChannel : 3
     pyramid:
       gaussian_downscale : 2
       gaussian_levels : 6
@@ -106,13 +108,15 @@ registrations:
     early_stopping_criteria: ''
     histo_bins: 64
     lr:
-      mine: 0.01
-      v1: 1.0e-05
-      vL: 0.001
+      MINE: 0.01
+      HomographyNet:
+        v1: 1.0e-05
+        vL: 0.001
     min_delta: .inf
-    n_iterations: 500
+    n_iterations: 5
     sampling_ratio: 0.1
     n_neurons: 100
+    patience : 30
   Personal:
     TO BE DEFINED: null
   airlab:
