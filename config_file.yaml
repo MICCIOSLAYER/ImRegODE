@@ -112,11 +112,11 @@ registrations:
       HomographyNet:
         v1: 1.0e-05
         vL: 0.001
-    min_delta: .inf
     n_iterations: 5
     sampling_ratio: 0.1
     n_neurons: 100
     patience : 30
+    min_delta: 1.e-4
   Personal:
     TO BE DEFINED: null
   airlab:

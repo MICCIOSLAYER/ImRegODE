@@ -35,6 +35,8 @@ def download_file(
 
     pass
 
-
+def import_trial():
+    print('successful')
+    return None
 if __name__ == "__main__":
     print(config_file_path)
