@@ -6,13 +6,30 @@ __pycache__/
 # C extensions
 *.so
 
+# --------------------
+#PROJECT - SPECS
+#---------------------
+
 # content and dir
+# Local Notebooks
 /Main_Folder/Notebooks/
-/Main_Folder/Results/
+
+#Esperimental Results
+/Main_Folder/Results/*
+!/Main_Folder/Results/.gitkeep
+
+# Local copy of datasets (FIRE reorganized for experiments)
 /Main_Folder/Modules/dataset/
+
+#Local Airalb clone
 /Main_Folder/Airlab_repo/
 
+# VSCode workspace settings
+.vscode/
+
+#------------------------
 # Distribution / packaging
+#----------------------
 .Python
 build/
 develop-eggs/
