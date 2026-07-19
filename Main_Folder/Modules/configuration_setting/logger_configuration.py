@@ -1,9 +1,11 @@
 import logging
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Literal
+
+LOGGING_LEVEL = Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 
 def set_logger(
-    level: int = logging.INFO,
+    level:  LOGGING_LEVEL = 'DEBUG',
     log_file: Optional[Union[str, Path]] = None
 ) -> logging.Logger:
     '''
@@ -25,7 +27,9 @@ def set_logger(
 
     logger = logging.getLogger(__name__)
     logger.handlers.clear()
-    logger.setLevel(level)
+
+    log_level = getattr(logging, level.upper())
+    logger.setLevel(log_level)
 
     formatter = logging.Formatter(
         '[%(levelname)s] %(name)s - %(message)s'
@@ -33,7 +37,7 @@ def set_logger(
 
     # console
     ch = logging.StreamHandler()
-    ch.setLevel(level)
+    ch.setLevel(log_level)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
