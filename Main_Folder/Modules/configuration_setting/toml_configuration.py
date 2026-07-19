@@ -10,7 +10,7 @@ import re
 import sys
 from importlib import import_module
 from typing import Optional
-import importlib.etadata
+import importlib.metadata
 from Main_Folder.Modules.utils import get_root_path
 
 IN_COLAB = 'google.colab' in sys.modules
