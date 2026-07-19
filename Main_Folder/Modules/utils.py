@@ -1,13 +1,18 @@
 # FIle containing function f trasversal utility
-import sys
-import os
+#import sys
+#import os
 from pathlib import Path
+#import numpy as np
+#import yaml
+#from typing import Tuple, Literal
+#import logging
 
 
 
 # ======================================================================================
 #                                     PATHS UTILITIES
 # ======================================================================================
+
 
 def get_root_path(
     start_path: Path | None = None,
@@ -38,5 +43,47 @@ def get_root_path(
             return path
 
     raise FileNotFoundError(
-        f"Project root '{project_name}' not found." # FIXME search in daughters dirs
+        f"Project root '{project_name}' not found." 
     )
+
+
+
+# ======================================================================================
+#                                     OBJS UTILITIES
+# ======================================================================================
+
+
+def deep_update(
+    base_dict: dict,
+    higher_priority_dict: dict,
+) -> dict:
+    '''
+    A recursive function to update a dict starting from a base: BASE_DICT and using the HIGHER_PRIORITY_DICT to update/add k,v to the base dict
+
+
+    Args:
+        base_dict (dict): The base dictionary to be updated.
+        higher_priority_dict (dict): The dictionary with higher priority values that will be used to update the base dictionary.
+
+    Returns:
+        dict: The updated dictionary.
+    '''
+
+    merged = base_dict.copy()
+
+    for key, value in higher_priority_dict.items():
+
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            merged[key] = deep_update(
+                merged[key],
+                value,
+            )
+
+        else:
+            merged[key] = value
+
+    return merged
