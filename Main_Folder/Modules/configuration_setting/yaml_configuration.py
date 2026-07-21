@@ -3,9 +3,11 @@ from typing import Literal
 from pathlib import Path
 import yaml
 
-from Main_Folder.Modules.utils import deep_update
+
+from Main_Folder.Modules.utils import deep_update, get_root_path, concatenate_paths
 from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
 
+root_path = get_root_path()
 standard_log = set_logger(level = 'DEBUG')
 
 def yaml_config_setup(yaml_path: Path,
@@ -110,6 +112,7 @@ def yaml_config_setup(yaml_path: Path,
             yaml.safe_dump(default_config, f)
         return default_config
     else:
+        standard_log.info(f' opening the file {yaml_path.stem} to downloading the dict')
         with open(yaml_path, 'r') as f:
             config = yaml.safe_load(f) or {}
         if priority == 'personal':
@@ -119,5 +122,15 @@ def yaml_config_setup(yaml_path: Path,
         elif priority == 'default':
             config = deep_update(base_dict=config, 
                                  higher_priority_dict=default_config)
-            
+        
+        # ------------------
+        # RESOLVE PATHS VALS
+        # ------------------
+        
+        path_config_dict = config['constant']['path-like']
+        standard_log.debug(f'prior conversion of path-like: the RESULTS term is {path_config_dict['RESULTS']}')
+        path_dict = {k: concatenate_paths(root= root_path, relative_path= Path(*path_config_dict[k])) for k in path_config_dict.keys()}
+        for k, v in path_dict.items():
+            config['constant']['path-like'][k] = v
+        standard_log.debug(f'after conversion of paths-like, the RESULTS term began:{config['constant']['path-like']['RESULTS']}  ')
         return config

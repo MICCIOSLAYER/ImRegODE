@@ -5,10 +5,10 @@ from pathlib import Path
 #import numpy as np
 #import yaml
 #from typing import Tuple, Literal
-#import logging
+from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
 
 
-
+logs = set_logger()
 # ======================================================================================
 #                                     PATHS UTILITIES
 # ======================================================================================
@@ -47,6 +47,57 @@ def get_root_path(
     )
 
 
+def concatenate_paths(root: Path, relative_path: Path | str) -> Path:
+    '''
+    Concatenate root path with a relative path and return the full path.
+    Args:
+        root (Path): The root directory path.
+        relative_path (str): The relative path to concatenate with the root.
+    Returns:
+        Path: The full concatenated path.
+    '''
+    # 1. Get the path of the files, assert the existence of root dir and the absolute( of relative path)
+    
+    if not root.exists():
+        logs.error(f'Root path {root} does not exist. Please check the path and try again.')
+        raise FileNotFoundError(f'Root path {root} does not exist.')
+    if isinstance(relative_path, str): # usa config_file
+        relative_path = Path(relative_path)
+        if not isinstance(relative_path,Path):
+            try:
+                relative_path = Path(*relative_path)
+                if not isinstance(relative_path,Path):
+                    logs.error(f'Error converting relative_path to Path: {relative_path}')
+            except Exception as e:
+                raise TypeError(f'Error converting relative_path to Path, since its type is: {type(relative_path)}.')
+
+    # 2. define the different dirs of both path in two different Sequence: lists/tuples
+    
+    # 3. Easy Case: the concatenation (root/relative_path) exists and is correct, return it
+    if (root / relative_path).exists():
+        return root / relative_path
+    
+    # 4. Not that simple case: the concatenation doesn't exist, remove repetition: start from the root, 
+    # then remove every dir in the relative path that is already in the root and then concatenate the rest of the relative path to the root, 
+    # return the full path
+
+    root_parts = root.parts
+    rel_parts = relative_path.parts
+
+    # Trova massimo overlap ordinato:
+    # suffix di root == prefix di relative_path
+    max_overlap = min(len(root_parts), len(rel_parts))
+    overlap = 0
+
+    for k in range(max_overlap, 0, -1):
+        if root_parts[-k:] == rel_parts[:k]:
+            overlap = k
+            break
+
+    merged_path = root.joinpath(*rel_parts[overlap:])
+
+    return merged_path
+    
 
 # ======================================================================================
 #                                     OBJS UTILITIES
