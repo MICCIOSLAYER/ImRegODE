@@ -1,6 +1,6 @@
 # FIle containing function f trasversal utility
-#import sys
-#import os
+import sys
+import os
 from pathlib import Path
 #import numpy as np
 #import yaml
@@ -160,6 +160,27 @@ def concatenate_paths(root: Path, relative_path: Path | str) -> Path:
 
     return merged_path
     
+
+def walk_through_dir(dir_path):
+  """
+  Walks through dir_path returning dimension of itscontents.
+  Args:
+    dir_path (str or pathlib.Path): target directory
+  
+  Returns:
+    A print out of:
+      number of subdiretories in dir_path
+      number of images (files) in each subdirectory
+      name of each subdirectory
+      in the format:
+        for dirpath, dirnames, filenames in os.walk(dir_path):
+          print(f"There are {len(dirnames)} directories and {len(filenames)} files in '{dirpath}'.")
+ 
+  """
+  
+  for dirpath, dirnames, filenames in os.walk(dir_path):
+    logs.info(f"There are {len(dirnames)} directories and {len(filenames)} files in '{dirpath}'.")
+
 
 # ======================================================================================
 #                                     OBJS UTILITIES
