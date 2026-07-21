@@ -6,9 +6,71 @@ from pathlib import Path
 #import yaml
 #from typing import Tuple, Literal
 from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
+from timeit import default_timer as timer
+from contextlib import contextmanager
+from functools import wraps
+import time
+from datetime import datetime
 
 
 logs = set_logger()
+
+# ======================================================================================
+#                                     TIMING UTILITIES
+# ======================================================================================
+
+
+# creation of a time tracker for functions as decorator:
+def timeit(func):
+    '''it get the time taken by a function to execute, to get the value
+    of time from the function results, use it as follows: 
+
+    @timeit
+    def my_function(...):
+        ...
+        return result
+
+    result, time_taken = my_function(...)'''
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        time_taken = end - start
+        # NOTE use logging to get the time taken info
+        return result, time_taken
+    return wrapper
+
+
+
+#creation of a context manager to get the time taken by a code block:
+@contextmanager
+def block_time():
+    '''Context manager to measure the time taken by a code block.
+    Usage: 
+    with block_time() as t:
+        # code block to measure
+        ...
+    time_taken = t[0]
+    '''
+    start = time.perf_counter()
+    t = [None]
+    yield t
+    t[0] = time.perf_counter() - start
+    
+    
+#
+def get_data_time()->str:
+    '''Get the current date and time as a formatted string specifically for file naming.
+    
+    Returns
+    -----
+    the str as format of YearMonthDay-HourMinuteSecond'''
+    now = datetime.now()
+    current_time = now.strftime("%Y%m%d-%H%M%S")
+    return current_time
+
+
 # ======================================================================================
 #                                     PATHS UTILITIES
 # ======================================================================================
