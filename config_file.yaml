@@ -90,6 +90,9 @@ constant:
     - Main_Folder
     - Results
   text-like:
+    A_FOLDER: Longitudinal_Studies
+    S_FOLDER: Super_Resolution
+    P_FOLDER: Mosaicing
     FIXED: _1
     MOVING: _2
     REFERENCE_FOLDER: Reference
