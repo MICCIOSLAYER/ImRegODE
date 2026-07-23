@@ -183,6 +183,24 @@ def walk_through_dir(dir_path):
     standard_log.info(f"There are {len(dirnames)} directories and {len(filenames)} files in '{dirpath}'.")
 
 
+
+def get_dirs_of(file_path : Path,
+                )->list[str]:
+    '''
+    given a certain path it get all the dir as a list of str to get this image
+    in the format of a list as:
+
+    [test/reference, deformation_type, file_name]
+
+    ['Reference', 'Longitudinal_Studies', 'A01_1.jpg']
+    '''
+    if not file_path.is_file():
+        image_type, image_deformation = file_path.parts[-2:]
+        return [image_type, image_deformation]
+        
+    image_type, image_deformation, file_name =  file_path.parts[-3:]
+    return [image_type, image_deformation, file_name]
+
 # ======================================================================================
 #                                     OBJS UTILITIES
 # ======================================================================================
