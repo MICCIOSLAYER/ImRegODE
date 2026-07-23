@@ -10,7 +10,7 @@ import SimpleITK as sitk
 import itk
 from itertools import islice
 from airlab.utils.image import Image as AirlabImage # NOTE consider to move airlab from TESI_MAGISTRALE to another folder
-
+from pathlib import Path
 import logging
 image_type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
 #---------------------
