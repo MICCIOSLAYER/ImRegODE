@@ -1,15 +1,19 @@
 # script to manage all classes regarding data management:
 
-from typing import  Callable, TypedDict, Optional, Tuple, Dcit, List, Sequence, Required, NotRequired, Union
+from typing import  Callable, TypedDict, Optional, Tuple, Dcit, List, Sequence, Required, NotRequired, Union, Literal
 from pathlib import Path
 import torch
+from datetime import datetime
+import pickle
 from torch.utils.data import Dataset, DataLoader
 from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
+from Main_Folder.Modules.utils import get_root_path
 from torchvision import transforms
-import random
+import random 
+
 from PIL import Image as PImage
 
-
+root_path = get_root_path()
 standard_logs = set_logger(level='DEBUG')
 
 class SampleDict(TypedDict):
@@ -208,3 +212,125 @@ class ImageRegistrationCustom(Dataset):
         if self.target_transform:
             reference_image = self.target_transform(reference_image)
         return test_image, reference_image 
+
+
+# =================
+# DATA COLLECTION OBJECT
+# =================
+
+
+
+class Registration_Data_Collector:
+    '''
+    A class to collect and store registration data on the entire dataset. For every specific image_pair/registration method,
+    '''
+    def __init__(self):
+        self.collection = {}
+        self.logs = standard_logs
+
+    def add_registration_data(self,
+                              image_pair_name: str, 
+                              registration_data: dict, #NOTE to be fixed ? to introduce them as a (use of assert to get these information for sure?) for naed, time and matrix?
+                              registration_name: str | None = None,
+                              filtred_data: Union[bool, list[str]] = False):
+        '''
+        Collect registration information for a specific image pair and registration method.
+
+        Parameters
+            image_pair_name: str
+                the pair name to refer to
+            registration_data : dict
+                the dictionary resulted from registration loop, already with the results
+            registration_name : str
+                the registration algorithm to adressing the dataframe sequently
+            filtred_data: (bool, list[str])
+                to define if the data to add should be complete or not
+        
+        
+        '''
+        
+        if image_pair_name not in self.collection:
+            self.collection[image_pair_name] = {}
+        for key, value in registration_data.items(): #FIXME be more specific on which data to add 
+            try:
+                if value.device == 'cuda':
+                    value = value.detach().cpu()
+            except:
+                pass
+            if filtred_data and filtred_data != ['']:
+                if key  not in filtred_data:
+                    continue
+            self.collection[image_pair_name][key] = value # NOTE si può mettere in un finally?
+        
+        if registration_name:
+            self.registration_name = registration_name
+        else:
+            self.registration_name= f'registration_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+        
+
+    @property
+    def get_dataframe(self) -> pd.DataFrame:
+        '''
+        Convert the collected registration data into a pandas DataFrame.
+        '''
+        df = pd.DataFrame.from_dict(self.collection, orient="index")
+        df.index.name = "image_pair_name"
+        return df.reset_index().set_index('image_pair_name')
+    
+    def save_data(self, 
+                  filename: Optional[str],
+                  fmt : Optional[str],
+                  results_path :str | Path = RESULT_PATH ,
+                  overwrite: bool = False,
+                  IN_COLAB: bool = False,
+                  )->Path:
+        '''Saving the collected data to a file in the specified format (csv or json or excel).
+        results_path as to be the directory where all esults are kept'''
+        filepath = Path(results_path / 'CSVResults')
+        picklepath = Path(results_path/ 'DataCollectors')
+        if not filepath.exists():
+            filepath.mkdir(parents=True, exist_ok=True)
+        filename = filename or self.registration_name 
+
+        # setting file format 
+        fmt = (fmt or Path(filename).suffix.lstrip('.')).lower()
+        avaiable_formats = ['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle']
+        if fmt not in avaiable_formats:
+            fmt = 'csv'
+        
+        df = self.get_dataframe
+        filename = Path(filename).stem
+        fmt = 'xlsx' if fmt in ('excel', 'xls', 'xlsx') else fmt
+        path = filepath / f'{filename}.{fmt}'
+
+
+        if path.exists() and not overwrite:
+            filename = f'{filename}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            path = filepath / f'{filename}.{fmt}'
+        
+        if fmt=='csv': 
+            df.to_csv(path, index=True)
+        elif fmt=='json':
+            df.to_json(path, orient="index")
+        elif fmt=='xlsx':
+            df.to_excel(path)
+        elif fmt in ['pkl', 'pickle']:
+            path = picklepath / f'{filename}.{fmt}'
+            if path.exists() and not overwrite:
+                filename = f'{filename}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+                path = picklepath / f'{filename}.{fmt}'
+            if IN_COLAB:
+                torch.save(
+                    self,
+                    f=path,
+                    pickle_module=pickle,
+                    pickle_protocol=pickle.HIGHEST_PROTOCOL
+                )
+            else:
+                with open(path, 'wb') as pickle_file:
+                    pickle.dump(self,
+                                pickle_file,
+                                pickle.HIGHEST_PROTOCOL)
+        else:
+            raise ValueError(f"Unsupported format: {fmt}. Supported formats are 'csv', 'json', 'excel' or 'pickle'.")
+        return path
