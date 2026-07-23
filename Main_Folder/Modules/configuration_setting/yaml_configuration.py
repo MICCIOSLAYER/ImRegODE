@@ -134,3 +134,40 @@ def yaml_config_setup(yaml_path: Path,
             config['constant']['path-like'][k] = v
         standard_log.debug(f'after conversion of paths-like, the RESULTS term began:{config['constant']['path-like']['RESULTS']}  ')
         return config
+
+
+yaml_file_path = concatenate_paths(root = root_path, relative_path='config_file.yaml')
+
+class FrameworkConfig:
+    ' a class to use the config_dict in modules'
+    def __init__(self,
+                    yaml_path: Path= yaml_file_path,
+                    priority : Literal['personal', 'default'] = 'personal'):
+        self._config_dict = yaml_config_setup(yaml_path=yaml_path, priority=priority)
+
+
+    @property
+    def config_dict(self):
+        return self._config_dict
+    
+
+    @property
+    def path_dict(self):
+        return self._config_dict['constant']['path-like']
+
+
+    @property
+    def num_dict(self):
+        return self._config_dict['constant']['num-like']
+
+
+    @property
+    def text_dict(self):
+        return self._config_dict['constant']['text-like']
+
+    
+    @property
+    def registrations(self):
+        return self._config_dict['registrations']
+
+    
