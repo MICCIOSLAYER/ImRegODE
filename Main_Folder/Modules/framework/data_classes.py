@@ -6,15 +6,16 @@ import torch
 from datetime import datetime
 import pickle
 from torch.utils.data import Dataset, DataLoader
-from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
+from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import get_root_path
 from torchvision import transforms
 import random 
+import pandas as pd
 
 from PIL import Image as PImage
 
 root_path = get_root_path()
-standard_logs = set_logger(level='DEBUG')
+standard_log = get_logger(__name__)
 
 class SampleDict(TypedDict):
     '''
@@ -81,7 +82,7 @@ class SimpleImRegDataSet(Dataset):
         self.reference_folder_name = reference_folder_name
         self.test_folder_name = test_folder_name
         self.transforms = transforms
-        self.logs = standard_logs # NOTE control
+        self.logs =  get_logger(f'{type(self).__module__}.{type(self).__name__}')
 
         self.test_images = sorted(list(self.dataset_folder_path.glob(f'Images/{self.test_folder_name}/*/*')))
         self.reference_images = sorted(list(self.dataset_folder_path.glob(f'Images/{self.reference_folder_name}/*/*')))
@@ -125,7 +126,7 @@ class ImageRegistrationCustom(Dataset):
                 dataset_folder_path: Path, # the path of FIRE dataset: Path.cwd().parent / 'Modules' / 'dataset' / 'FIRE'
                 transform=None, 
                 target_transform=None)->None:
-        self.logs = standard_logs # NOTE to control
+        self.logs =  get_logger(f'{type(self).__module__}.{type(self).__name__}')
         self.dataset_path = dataset_folder_path
         path_to_image_types = dataset_folder_path / 'Images' 
         path_to_deformation_types = dataset_folder_path /  'Images' / 'Test' 
@@ -226,7 +227,7 @@ class Registration_Data_Collector:
     '''
     def __init__(self):
         self.collection = {}
-        self.logs = standard_logs
+        self.logs =  get_logger(f'{type(self).__module__}.{type(self).__name__}')
 
     def add_registration_data(self,
                               image_pair_name: str, 

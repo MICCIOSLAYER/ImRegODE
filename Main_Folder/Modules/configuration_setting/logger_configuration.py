@@ -25,7 +25,7 @@ def set_logger(
     for h in logging.root.handlers[:]:
         logging.root.removeHandler(h)
 
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger()
     logger.handlers.clear()
 
     log_level = getattr(logging, level.upper())
@@ -49,3 +49,6 @@ def set_logger(
         logger.addHandler(fh)
 
     return logger
+
+def get_logger(name:str):
+    return logging.getLogger(name)

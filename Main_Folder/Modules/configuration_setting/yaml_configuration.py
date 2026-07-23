@@ -5,10 +5,10 @@ import yaml
 
 
 from Main_Folder.Modules.utils import deep_update, get_root_path, concatenate_paths
-from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
+from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 
 root_path = get_root_path()
-standard_log = set_logger(level = 'DEBUG')
+standard_log = get_logger(__name__)
 
 def yaml_config_setup(yaml_path: Path,
                       priority: Literal['default', 'personal']='personal') -> dict:

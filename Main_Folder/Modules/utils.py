@@ -5,7 +5,7 @@ from pathlib import Path
 #import numpy as np
 #import yaml
 #from typing import Tuple, Literal
-from Main_Folder.Modules.configuration_setting.logger_configuration import set_logger
+from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from timeit import default_timer as timer
 from contextlib import contextmanager
 from functools import wraps
@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 
 
-logs = set_logger()
+standard_log = get_logger(__name__)
 
 # ======================================================================================
 #                                     TIMING UTILITIES
@@ -102,8 +102,9 @@ def get_root_path(
     for path in [start_path] + list(start_path.parents):
 
         if path.stem == project_name:
+            standard_log.debug(f'the root path is : {path}')
             return path
-
+    
     raise FileNotFoundError(
         f"Project root '{project_name}' not found." 
     )
@@ -121,7 +122,7 @@ def concatenate_paths(root: Path, relative_path: Path | str) -> Path:
     # 1. Get the path of the files, assert the existence of root dir and the absolute( of relative path)
     
     if not root.exists():
-        logs.error(f'Root path {root} does not exist. Please check the path and try again.')
+        standard_log.error(f'Root path {root} does not exist. Please check the path and try again.')
         raise FileNotFoundError(f'Root path {root} does not exist.')
     if isinstance(relative_path, str): # usa config_file
         relative_path = Path(relative_path)
@@ -179,7 +180,7 @@ def walk_through_dir(dir_path):
   """
   
   for dirpath, dirnames, filenames in os.walk(dir_path):
-    logs.info(f"There are {len(dirnames)} directories and {len(filenames)} files in '{dirpath}'.")
+    standard_log.info(f"There are {len(dirnames)} directories and {len(filenames)} files in '{dirpath}'.")
 
 
 # ======================================================================================
