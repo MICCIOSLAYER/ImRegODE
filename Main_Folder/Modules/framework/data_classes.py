@@ -1,11 +1,12 @@
 # script to manage all classes regarding data management:
 
-from typing import  Callable, TypedDict, Optional, Tuple, Dcit, List, Sequence, Required, NotRequired, Union, Literal
+from typing import  Callable, TypedDict, Optional, Tuple, Dict, List, Sequence, Required, NotRequired, Union, Literal
 from pathlib import Path
 import torch
 from datetime import datetime
 import pickle
 from torch.utils.data import Dataset, DataLoader
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import get_root_path, get_dirs_of
 import os
@@ -15,6 +16,7 @@ import pandas as pd
 
 from PIL import Image as PImage
 
+frame_dict = FrameworkConfig()
 root_path = get_root_path()
 standard_log = get_logger(__name__)
 
@@ -106,7 +108,7 @@ class SimpleImRegDataSet(Dataset):
             reference_image = self.transforms(reference_image)
         
         return test_image, reference_image, str(test_image_path), str(reference_image_path)
-    
+    # FIXME the return of the tuple as sample = dataset.__getitem__[0] return a tuple for path, try to get the path itself no tuple
     def get_nChannel(self) ->int:
         
         image_test= PImage.open(self.test_images[0]) 
@@ -282,7 +284,7 @@ class Registration_Data_Collector:
     def save_data(self, 
                   filename: Optional[str],
                   fmt : Optional[str],
-                  results_path :str | Path = RESULT_PATH ,
+                  results_path :str | Path = frame_dict.path_dict['RESULTS'] ,
                   overwrite: bool = False,
                   IN_COLAB: bool = False,
                   )->Path:
