@@ -79,6 +79,8 @@ def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
     standard_log.info(f'reference/test image sample shape: {preprocessed_sample["reference_sample"].shape}')
     return preprocessed_sample
 
+
+
 def sitk_preprocessing(sample_dict : SampleDict, 
                        config_dict: dict = _default_framework_cfg
                        )-> dict:
@@ -96,8 +98,10 @@ def sitk_preprocessing(sample_dict : SampleDict,
     Returns:
         SampleDict: A dictionary containing the preprocessed reference and test samples.
     '''
-
-    preprocessed_sample = sample_dict.copy()
+    transformations = None
+    preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
+                                                config_dict=config_dict,
+                                                transformations=transformations)
     return preprocessed_sample
 
 
@@ -117,9 +121,13 @@ def airlab_preprocessing(sample_dict : SampleDict,
         SampleDict: A dictionary containing the preprocessed reference and test samples.
     '''
     #===========READ IMAGES========
+    transformations = None
+    preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
+                                                config_dict=config_dict,
+                                                transformations=transformations)
     
 
-    return sample_dict
+    return preprocessed_sample
 
 
 
@@ -135,8 +143,14 @@ def drmine_preprocessing(sample_dict : SampleDict,
     Returns:
         SampleDict: A dictionary containing the preprocessed reference and test samples.
     '''
-    preprocessed_sample = sample_dict.copy()
+
+    transformations = None
+    preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
+                                                config_dict=config_dict,
+                                                transformations=transformations)
     return preprocessed_sample
+
+
 
 def elastix_preprocessing(sample_dict : SampleDict, 
                        config_dict: dict = _default_framework_cfg
@@ -150,6 +164,9 @@ def elastix_preprocessing(sample_dict : SampleDict,
     Returns:
         SampleDict: A dictionary containing the preprocessed reference and test samples.
     '''
-    preprocessed_sample = sample_dict.copy()
+    transformations = None
+    preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
+                                                config_dict=config_dict,
+                                                transformations=transformations)
     return preprocessed_sample
 
