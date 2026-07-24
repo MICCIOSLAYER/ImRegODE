@@ -21,7 +21,7 @@ image_type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
 
 
 standard_log = get_logger(__name__)
-_default_framework_cfg = FrameworkConfig().config_dict()
+_default_framework_cfg = FrameworkConfig().config_dict
 
 
 #------------
@@ -169,4 +169,5 @@ def elastix_preprocessing(sample_dict : SampleDict,
                                                 config_dict=config_dict,
                                                 transformations=transformations)
     return preprocessed_sample
+
 
