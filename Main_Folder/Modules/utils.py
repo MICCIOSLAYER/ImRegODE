@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 #import numpy as np
 #import yaml
-#from typing import Tuple, Literal
+from typing import  Literal
+import torch
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from timeit import default_timer as timer
 from contextlib import contextmanager
@@ -242,9 +243,6 @@ def deep_update(
     return merged
 
 
-from typing import Literal
-import torch
-# NOTE in utils script.py
 
 def permute_channel_layout(
     image: torch.Tensor,
