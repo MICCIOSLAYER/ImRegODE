@@ -3,6 +3,7 @@
 from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union
 
 from Main_Folder.Modules.framework.data_classes import SampleDict
+from Main_Folder.Modules.framework.visualization import _image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
@@ -12,6 +13,7 @@ from itertools import islice
 from airlab.utils.image import Image as AirlabImage # NOTE consider to move airlab from TESI_MAGISTRALE to another folder
 from pathlib import Path
 import logging
+from fractions import Fraction
 image_type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
 #---------------------
 #REGISTRATION PIPELINE
@@ -171,3 +173,47 @@ def elastix_preprocessing(sample_dict : SampleDict,
     return preprocessed_sample
 
 
+#===================
+# CROP FNS
+#==================
+def crop_images(moving_image : Path | torch.Tensor,
+                fixed_image : Path | torch.Tensor,
+                config_dict : dict | FrameworkConfig,
+                show_images : bool = False,
+                )-> Tuple[torch.Tensor, torch.Tensor]:
+    '''
+    given the images it crop to the desired size 
+    if requested the images are shown as confront between the original and the cropped
+    
+    Parameters:
+    moving_image : Path | torch.Tensor
+        the image to crop, it can be a path or a tensor given by the dataloader
+    fixed_image : Path | torch.Tensor
+        the image to crop, it can be a path or a tensor given by the dataloader 
+    show_images : bool
+        whether to show the images or not
+        
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: the cropped images
+        
+    '''
+
+    #open the images depending on the type
+    move_image= _image_to_numpy(moving_image)
+    fix_image = _image_to_numpy(fixed_image)
+    if isinstance(config_dict, dict):
+        LOWEDGE_BOX, HIGHEDGE_BOX = config_dict.get('LOWEDGE_BOX', float(Fraction(1.5/9))), config_dict.get('HIGHEDGE_BOX', float(Fraction(7.5/9)))
+    else:
+        num_dict = config_dict.num_dict
+        LOWEDGE_BOX, HIGHEDGE_BOX = num_dict['LOWEDGE_BOX'], num_dict['HIGHEDGE_BOX']
+    cropped_moving_image = move_image[int(move_image.shape[0]*LOWEDGE_BOX):int(move_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*move_image.shape[1]):int(HIGHEDGE_BOX*move_image.shape[1]), :]
+    cropped_fixed_image = fix_image[int(LOWEDGE_BOX*fix_image.shape[0]):int(fix_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*fix_image.shape[1]):int(HIGHEDGE_BOX*fix_image.shape[1]), :]
+
+    
+
+    standard_log.debug(f'the shape of the original moving image is: {move_image.shape}, the shape of the cropped moving image is: {cropped_moving_image.shape}')
+    standard_log.debug(f'the shape of the original fixed image is: {fix_image.shape}, the shape of the cropped fixed image is: {cropped_fixed_image.shape}')
+    return cropped_moving_image, cropped_fixed_image
+
+
+    
