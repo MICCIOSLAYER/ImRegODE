@@ -240,3 +240,81 @@ def deep_update(
             merged[key] = value
 
     return merged
+
+
+from typing import Literal
+import torch
+# NOTE in utils script.py
+
+def permute_channel_layout(
+    image: torch.Tensor,
+    target_format: Literal["**C", "C**"],
+    n_channel: int | None = None,
+) -> torch.Tensor:
+    """
+    Convert image layout between channel-last (**C) and channel-first (C**).
+
+    "**C" means (H, W, C)
+    "C**" means (C, H, W)
+    Parameters
+    ----------
+    image: (torch.Tensor) the image to permute dimensions
+    target_format (Literal['**c', 'c**']): define the final format of image, to adjust the permutation considering this
+    n_channel (Optional[int]): for different type of images where nChannels is not standard as the minimum of args of [C, H, W]
+
+    If the image is grayscale after squeeze, i.e. ndim <= 2,
+    it is returned unchanged.
+    """
+    standard_log
+
+    image = image.squeeze()
+
+    if image.ndim <= 2:
+        logs.info('the image is a grayscale, no need to permute it')
+        return image
+
+    if image.ndim != 3:
+        raise ValueError(
+            f"Expected a 2D or 3D image after squeeze, got shape {image.shape}"
+        )
+
+    d1, _, d3 = image.shape
+
+    if n_channel is not None:
+        if d1 == n_channel:
+            current_format = "C**"
+
+        elif d3 == n_channel:
+            current_format = "**C"
+        else:
+            raise ValueError(
+                f"Cannot find channel dimension with n_channel={n_channel} "
+                f"in image shape {image.shape}"
+            )
+    else:
+        # fallback euristico: il canale è la dimensione più piccola
+        channel_axis = torch.argmin(torch.tensor(image.shape)).item()
+
+        if channel_axis == 0:
+            current_format = "C**"
+        elif channel_axis == 2:
+            current_format = "**C"
+        else:
+            raise ValueError(
+                f"Channel axis appears to be in the middle for shape {image.shape}. "
+                "Expected channel-first or channel-last."
+            )
+
+    if current_format == target_format:
+        standard_log.info(f'the image shape {image.shape} is already in the format {target_format}')
+        return image
+
+    if current_format == "**C" and target_format == "C**":
+        standard_log.info(f'the image shape {image.shape} will be transposed in the format {target_format}')
+        return image.permute(2, 0, 1)
+
+    if current_format == "C**" and target_format == "**C":
+        standard_log.info(f'the image shape {image.shape} will be transposed in the format {target_format}')
+        return image.permute(1, 2, 0)
+
+    raise ValueError(f"Unsupported target_format: {target_format}")
