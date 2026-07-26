@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image as PImage
 from typing import Union, Optional, Sequence
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
+from Main_Folder.Modules.utils import permute_channel_layout
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
 
@@ -25,6 +26,8 @@ def _image_to_numpy(image : Image_Type
         np.ndarray: the image as np.ndarray 
     '''
     if isinstance(image, torch.Tensor):
+        if image.squeeze().ndim == 3:
+            return permute_channel_layout(image=image.squeeze(), target_format = '**C').detach().cpu().numpy()
         return image.squeeze().detach().cpu().numpy()
         
     elif isinstance(image, itk.Image):
