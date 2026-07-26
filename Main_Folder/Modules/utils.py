@@ -263,12 +263,12 @@ def permute_channel_layout(
     If the image is grayscale after squeeze, i.e. ndim <= 2,
     it is returned unchanged.
     """
-    standard_log
+    
 
     image = image.squeeze()
 
     if image.ndim <= 2:
-        logs.info('the image is a grayscale, no need to permute it')
+        standard_log.info('the image is a grayscale, no need to permute it')
         return image
 
     if image.ndim != 3:
