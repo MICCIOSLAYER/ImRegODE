@@ -8,7 +8,7 @@ import requests
 import zipfile
 from pathlib import Path
 
-standard_log = get_logger()
+standard_log = get_logger(__name__)
 
 def get_dataset(
         dataset_url: str,
