@@ -1,13 +1,14 @@
 # for preprocessing of various registration method
 
-from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union
-
+from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union, Literal
+from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.framework.visualization import _image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
 import SimpleITK as sitk
+import numpy as np
 import itk
 from itertools import islice
 from airlab.utils.image import Image as AirlabImage # NOTE consider to move airlab from TESI_MAGISTRALE to another folder
@@ -179,7 +180,7 @@ def elastix_preprocessing(sample_dict : SampleDict,
 def crop_images(moving_image : Path | torch.Tensor,
                 fixed_image : Path | torch.Tensor,
                 config_dict : dict | FrameworkConfig,
-                show_images : bool = False,
+                show_images : bool = False, # FIXME remove it
                 )-> Tuple[torch.Tensor, torch.Tensor]:
     '''
     given the images it crop to the desired size 
@@ -216,4 +217,150 @@ def crop_images(moving_image : Path | torch.Tensor,
     return cropped_moving_image, cropped_fixed_image
 
 
+    
+
+def crop_image_advance(
+        original_image: torch.Tensor | np.ndarray,
+        config_dict : dict | FrameworkConfig,
+        crop_mode: Optional[Literal['area_proportion', 'area_ratio','keep_props']] = None,
+        
+        new_O_O : Optional[Sequence[int]]= None,
+        new_image_center : Optional[Sequence[int]]= None,
+        centred : bool= True,
+        crop_style :  Literal['keep_size', 'shrink_to_fit'] = 'keep_size',
+        
+        
+        )-> Tuple[dict, torch.Tensor]:
+    '''
+    the function purpouse is to crop the image in 3 different avaiable ways: centred along original image, keeping proportions, not centred
+
+    Args:
+        original_image (Path | torch.Tensor | np.ndarray): The image must be in the shape format ( C, H, W)
+        final_height (int): the desired heigh of cropped image
+        final_width (int): the desired width of cropped image
+        area_ratio (Optional[float], optional): the area ratio between the original and the final image, to be defined only in case of keep_proportion is true
+        new_O_O (Optional[[int]], optional): the new left high corner of the image useful to the trasformation of decropped H
+        new_image_center (Optional[[int]], optional): to define the cropped area starting from a center point
+        centred (Optional[centred_dict], optional): to define if the cropped image centre and the original image centre are the same
+        crop_style ( Literal): define if keeps the dimension of the crop as costant sliding if outside the box or stop at the box, modifing the final_height and final_width
+        
+        config_dict(dict): the dict from the yaml configuration
+
+    Returns:
+    Tuple of a cropped dict and a cropped image as a tensor of 
+    A crop_dict={'h_f': final_height,
+                   'w_f': final_width,
+                   'image_center': image_center_coords,
+                   'corner_coords': new_O_O new coordinate respecting the original image dimension of the high left corner,useful to the trasformation of decropped H
+ 
+    A cropped_image (np.ndarray): the cropped image as a tensor of shape (1, C, h1, w1)
+    '''
+    # define dict for crop, depending on type
+    if isinstance(config_dict, dict):
+        crop_dict = config_dict
+    else:
+        crop_dict = config_dict.num_dict['crop_dict']
+    
+    final_height = crop_dict['final_height']
+    final_width = crop_dict['final_width']
+    area_ratio = crop_dict['area_ratio']
+    if isinstance(area_ratio, str) and '/' in area_ratio:
+        area_ratio = float(Fraction(area_ratio))
+    standard_log.debug(f'the measure chosen for the crop\nfinal_height: {final_height}; final_width: {final_width}')
+    if new_O_O == None:
+        new_O_O = [0, 0]
+
+    if isinstance(original_image, np.ndarray): #NOTE shape it has to be in (C, H, W)
+        original_image = permute_channel_layout(image=torch.from_numpy(original_image).float(), target_format = 'C**')
+
+        if original_image.ndim==3:
+            original_image=original_image.unsqueeze(0)
+
+    
+    
+    # NOTE to be used on image after taken by dataset/dataloader in shape (1, C, H, W)
+
+    
+    # =============HANDLE  MAX DIMENSIONS============
+    if (original_image.squeeze()).ndim == 3:
+        _, original_height, original_width = original_image.squeeze().shape
+    else:
+        original_height, original_width = original_image.squeeze().shape
+
+    original_center = [original_height//2, original_width//2]
+    standard_log.debug(f'\noriginal_center: [{original_center[0]}, {original_center[1]}]')
+
+    final_width = min(final_width, original_width)
+    final_height = min(final_height, original_height)
+    standard_log.debug(f'\nafter asdjusting the measure\nfinal_height: {final_height}; final_width: {final_width}')
+
+    # ============= HANDLE DIFFERENT OPTIONS============
+    
+    if crop_mode=='area_proportion': # NOTE General Case
+        area_ratio = area_ratio if 0 < area_ratio <=1 else 1.0
+        final_height = original_height*np.sqrt(area_ratio)
+        final_width = original_width*np.sqrt(area_ratio)
+        standard_log.debug(f'\nafter adjusting the measure considering the {crop_mode.upper()}\nfinal_height: {final_height}; final_width: {final_width}')
+
+    elif crop_mode=='keep_props': # Mantain proportion between original & finals
+        if final_width > final_height:
+            final_height = original_height*final_width/original_width
+        else:
+            final_width = original_width*final_height/original_height
+        standard_log.debug(f'\nafter adjusting the measure considering the {crop_mode.upper()}\nfinal_height: {final_height}; final_width: {final_width}')
+
+    elif crop_mode=='area_ratio': # Set the final dimension depend from area ratio
+        area_ratio = area_ratio if 0 < area_ratio <=1 else 1.0
+
+        if final_width > final_height:
+            final_height = original_height*original_width*area_ratio/(final_width)
+        elif final_width < final_height:
+            final_width = original_height*original_width*area_ratio/(final_height)
+        else: # NOTE use the case for keep proportions and area ratio
+            final_height = original_height*np.sqrt(area_ratio)
+            final_width = original_width*np.sqrt(area_ratio)
+        standard_log.debug(f'\nafter adjusting the measure considering the {crop_mode.upper()} \nfinal_height: {final_height}; final_width: {final_width}')
+
+
+    final_width= round(final_width)    
+    final_height= round(final_height)
+    standard_log.debug(f'\nafter rounding: rounded final H : {final_height}, W: {final_width}')
+    # GET coordinatio of the left high point from center 
+    if new_image_center != None:
+
+        new_dim = [final_height//2, final_width//2]
+        new_O_O = [ max(0,i-j) for i, j in zip(new_image_center, new_dim)]
+
+    elif centred: 
+        new_dim = [final_height//2, final_width//2]
+        new_O_O = [ max(0, i-j) for i, j in zip(original_center, new_dim)]
+    standard_log.debug(f'\nnew_high left corner: x0 {new_O_O[0]}, y0 {new_O_O[1]}')
+
+    #===== GENERATE CROPPED IMAGE FROM ORIGINAL===========
+    y0, x0 = new_O_O # new left high corner of image
+    
+    if crop_style == 'keep_size': # shift crop if necessary to keep the size of area requested for the crop
+        x0 = max(0, min(x0, int(original_width-final_width)))
+        y0 = max(0, min(y0, int(original_height-final_height)))
+        x1 = x0 + final_width
+        y1 = y0 + final_height
+        standard_log.debug(f'\nconsidering box adjustment to keep size of HxW:  {final_height} x {final_width}\n x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}')
+        
+    elif crop_style == 'shrink_to_fit': # sacrifice a part of area since outside the original image dimensions
+        x1 = x0 + final_width
+        y1 = y0 + final_height
+        x1 = min(x1, original_width)
+        y1 = min(y1, original_height)
+        standard_log.debug(f'\nconsidering box adjustment to keep size of {final_width} x {final_height}\n x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}')
+        
+    image_center_coords = [ y0 + final_height//2, x0 + final_width//2]
+    cropped_image = original_image[:, :, y0:y1, x0:x1]
+    new_O_O = [y0, x0]
+    crop_dict={'h_f': final_height,
+               'w_f': final_width,
+               'image_center': image_center_coords,
+               'corner_coords': new_O_O
+
+    }
+    return crop_dict, cropped_image
     
