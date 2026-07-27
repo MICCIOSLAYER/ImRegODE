@@ -412,7 +412,7 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
     Parameter
     ---------
     sample_dict (SampleDict): the dict with sample's  data 
-    config_dict (dict): the dict with configuration parameters
+    config_dict (dict | FrameworkConfig): the config with configuration parameters: if a dict it must have the keys (gaussian_downscale, gaussian_sigma)
 
     Returns
     -------
@@ -422,7 +422,11 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
     
     fixed_image = sample_dict['reference_sample']
     moving_image = sample_dict['test_sample']
-    drmine_pyramid_dict = config_dict['registrations']['DRMINE_original']['pyramid']
+    if isinstance(config_dict, dict):
+        drmine_pyramid_dict = config_dict
+    else:
+        drmine_pyramid_dict = config_dict.registrations['DRMINE_original']['pyramid']
+    
     downscale = drmine_pyramid_dict['gaussian_downscale']
     gaussian_sigma = drmine_pyramid_dict['gaussian_sigma']
     if np.ndim(fixed_image) != np.ndim(moving_image) or type(fixed_image) != type(moving_image):
