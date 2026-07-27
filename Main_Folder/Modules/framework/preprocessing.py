@@ -9,6 +9,9 @@ from Main_Folder.Modules.configuration_setting.yaml_configuration import Framewo
 import torch
 import SimpleITK as sitk
 import numpy as np
+import cv2
+from skimage.transform import pyramid_gaussian
+from skimage.filters import gaussian
 import itk
 from itertools import islice
 from airlab.utils.image import Image as AirlabImage # NOTE consider to move airlab from TESI_MAGISTRALE to another folder
@@ -180,13 +183,14 @@ def elastix_preprocessing(sample_dict : SampleDict,
 def crop_images(moving_image : Path | torch.Tensor,
                 fixed_image : Path | torch.Tensor,
                 config_dict : dict | FrameworkConfig,
-                show_images : bool = False, # FIXME remove it
+                
                 )-> Tuple[torch.Tensor, torch.Tensor]:
     '''
     given the images it crop to the desired size 
     if requested the images are shown as confront between the original and the cropped
     
-    Parameters:
+    Parameters
+    ------------
     moving_image : Path | torch.Tensor
         the image to crop, it can be a path or a tensor given by the dataloader
     fixed_image : Path | torch.Tensor
@@ -194,8 +198,9 @@ def crop_images(moving_image : Path | torch.Tensor,
     show_images : bool
         whether to show the images or not
         
-    Returns:
-        Tuple[torch.Tensor, torch.Tensor]: the cropped images
+    Returns
+    --------
+        Tuple[torch.Tensor, torch.Tensor]: the cropped images tuple (test_image_cropped, reference_image_cropped)
         
     '''
 
@@ -207,8 +212,8 @@ def crop_images(moving_image : Path | torch.Tensor,
     else:
         num_dict = config_dict.num_dict
         LOWEDGE_BOX, HIGHEDGE_BOX = num_dict['LOWEDGE_BOX'], num_dict['HIGHEDGE_BOX']
-    cropped_moving_image = move_image[int(move_image.shape[0]*LOWEDGE_BOX):int(move_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*move_image.shape[1]):int(HIGHEDGE_BOX*move_image.shape[1]), :]
-    cropped_fixed_image = fix_image[int(LOWEDGE_BOX*fix_image.shape[0]):int(fix_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*fix_image.shape[1]):int(HIGHEDGE_BOX*fix_image.shape[1]), :]
+    cropped_moving_image = torch.from_numpy(move_image[int(move_image.shape[0]*LOWEDGE_BOX):int(move_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*move_image.shape[1]):int(HIGHEDGE_BOX*move_image.shape[1]), :])
+    cropped_fixed_image = torch.from_numpy(fix_image[int(LOWEDGE_BOX*fix_image.shape[0]):int(fix_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*fix_image.shape[1]):int(HIGHEDGE_BOX*fix_image.shape[1]), :])
 
     
 
@@ -263,7 +268,7 @@ def crop_image_advance(
     
     final_height = crop_dict['final_height']
     final_width = crop_dict['final_width']
-    area_ratio = crop_dict['area_ratio']
+    area_ratio = crop_dict.get('area_ratio', 0)
     if isinstance(area_ratio, str) and '/' in area_ratio:
         area_ratio = float(Fraction(area_ratio))
     standard_log.debug(f'the measure chosen for the crop\nfinal_height: {final_height}; final_width: {final_width}')
@@ -351,7 +356,7 @@ def crop_image_advance(
         y1 = y0 + final_height
         x1 = min(x1, original_width)
         y1 = min(y1, original_height)
-        standard_log.debug(f'\nconsidering box adjustment to keep size of {final_width} x {final_height}\n x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}')
+        standard_log.debug(f'\nconsidering box adjustment to shrink to fit for {final_width} x {final_height}\n x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}')
         
     image_center_coords = [ y0 + final_height//2, x0 + final_width//2]
     cropped_image = original_image[:, :, y0:y1, x0:x1]
@@ -363,4 +368,87 @@ def crop_image_advance(
 
     }
     return crop_dict, cropped_image
+
+
+# ==============
+# NORMALIZE FN
+# ==============
+def normalize_img (image : image_type | torch.Tensor,
+                   normalization_interval: tuple[int,int] = (0,1)
+                   )-> torch.Tensor | np.ndarray:
+    '''
+    A simple  normalization function to mimic cv2.normalize fn
+    The formula to normalize the image is following: 
+
+                        img_norm(x_norm) = (x_img - img_MIN) * ( NORM_MAX - NORM_MIN)/ (img_MAX - img_MIN) + NORM_MIN
+
+
+    Args:
+        image (image_type | torch.Tensor): input image to normalize
+        normalization_interval (tuple[int,int], optional): the final min and max of the image values. Defaults to (0,1).
+
+    Returns:
+        torch.Tensor | np.ndarray: the normalize image
+    '''
+    NORM_MIN = min(normalization_interval)
+    NORM_MAX = max(normalization_interval)
+    if isinstance(image, torch.Tensor):
+        img_MIN, img_MAX = image.min(), image.max()
+        norm_image = (image - img_MIN)*(NORM_MAX - NORM_MIN)/ (img_MAX -img_MIN)
+        return norm_image
+    else: 
+        return cv2.normalize(_image_to_numpy(image), None, alpha=NORM_MIN, beta=NORM_MAX, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+#=============
+# PYRAMID
+#=============
+
+
+def coupled_gaussian_pyramid(sample_dict: SampleDict,
+                             config_dict : dict | FrameworkConfig,
+                             )-> SampleDict:
+    '''
+    it takes two images to performa gaussian filter in 6 progressive steps
+    Parameter
+    ---------
+    sample_dict (SampleDict): the dict with sample's  data 
+    config_dict (dict): the dict with configuration parameters
+
+    Returns
+    -------
+    SampleDict: updated sample dcit with the pyramids of images for both test and reference images
+
+    '''   
     
+    fixed_image = sample_dict['reference_sample']
+    moving_image = sample_dict['test_sample']
+    drmine_pyramid_dict = config_dict['registrations']['DRMINE_original']['pyramid']
+    downscale = drmine_pyramid_dict['gaussian_downscale']
+    gaussian_sigma = drmine_pyramid_dict['gaussian_sigma']
+    if np.ndim(fixed_image) != np.ndim(moving_image) or type(fixed_image) != type(moving_image):
+      raise ValueError("the two images must have the same type and dimension")
+    else:
+
+        if isinstance(fixed_image, torch.Tensor):
+            
+            fixed_image = fixed_image.squeeze().permute(1,2,0)
+            moving_image = moving_image.squeeze().permute(1,2,0)
+        if np.ndim(fixed_image) == 3:
+            standard_log.debug(f'the shape of the fixed image is: {fixed_image.shape}, the shape of the moving image is: {moving_image.shape}')
+            
+            channel_axis = torch.argmin(torch.tensor(fixed_image.shape)).item()
+            nChannel = fixed_image.shape[channel_axis]
+            standard_log.info(f'the number of channels in the images is: {nChannel}')
+            pyramid_fixed = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(fixed_image, sigma=gaussian_sigma, channel_axis=channel_axis), downscale=downscale, channel_axis=channel_axis)) # NOTE multichannel = True?
+            pyramid_moving = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(moving_image, sigma=gaussian_sigma, channel_axis=channel_axis), downscale=downscale, channel_axis=channel_axis)) # NOTE multichannel = True?
+        elif np.ndim(fixed_image) == 2:
+            nChannel=1
+            pyramid_fixed = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(fixed_image, sigma=gaussian_sigma, channel_axis=None), downscale=downscale)) # NOTE multichannel = False?
+            pyramid_moving = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(moving_image, sigma=gaussian_sigma, channel_axis=None), downscale=downscale)) # NOTE multichannel = False?
+        else:
+            standard_log.warning(f"Unknown rank for an image: {np.ndim(fixed_image)}")
+
+    sample_dict['reference_pyramid'] = pyramid_fixed
+    sample_dict['test_pyramid'] = pyramid_moving
+    sample_dict['nChannel'] = nChannel
+    return sample_dict
