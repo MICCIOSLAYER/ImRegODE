@@ -69,6 +69,20 @@ def build_pyproject_from_requirements(
     Ritorna
     -------
     dict con liste e mismatch trovati.
+
+
+    E.G.:
+    -----
+    build_pyproject_from_requirements(local_req=local_req,
+                                colab_req=colab_req,
+                                output_pyproject= tomlforuv,
+                                project_name="image-registration-project",
+                                version="0.1.0",
+                                requires_python=">=3.12",
+                                dev_packages=None,
+                                exclude_packages=None,
+                                direct_packages=None,
+                                run_uv_lock=False,
     """
 
     if dev_packages is None:
