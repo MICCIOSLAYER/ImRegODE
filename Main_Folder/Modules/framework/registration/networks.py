@@ -194,3 +194,40 @@ class MINE(nn.Module): #https://arxiv.org/abs/1801.04062
             MI_lb += torch.mean(z1) - torch.log(torch.mean(torch.exp(z2)))
 
         return MI_lb/self.bsize, z1, z2
+
+
+class MINE_INSIDE(nn.Module): # unravel the functioning of the net
+    
+    def __init__(self, nChannel: int, n_neurons:int=100):
+        super(MINE_INSIDE, self).__init__()
+        self.fc1 = nn.Linear(2*nChannel, n_neurons)
+        self.fc2 = nn.Linear(n_neurons, n_neurons)
+        self.fc3 = nn.Linear(n_neurons, 1)
+        self.bsize = 1 # 1 may be sufficient
+        self.nChannel = nChannel
+        self.logs= logging.getLogger(f'{__name__}.{type(self).__name__}')
+
+    def forward(self, y, ind):
+        x = y.view(y.size()[0]*y.size()[1],y.size()[2]) #flatten the tensor to use the rand perm and get random index
+        MI_lb=0.0
+        for i in range(self.bsize):
+            ind_perm = ind[torch.randperm(len(ind), device=ind.device)] # perchè non provare a farlo qua dentro usando torch.randperm(int(len(x[0]*sampling)))
+            z1_first = F.relu(self.fc1(x[ind,:]))
+            z2_first = self.fc1(torch.cat((x[ind,0:self.nChannel],x[ind_perm,self.nChannel:2*self.nChannel]),1))
+            z1_second = F.relu(self.fc2(z1_first)) 
+            z2_second = self.fc2(z2_first)
+            z1 = self.fc3(z1_second) 
+            z2 = self.fc3(z2_second)
+            #z1 = self.fc3(F.relu(self.fc2(F.relu(self.fc1(x[ind,:])))))
+            #z2 = self.fc3(F.relu(self.fc2(F.relu(self.fc1(torch.cat((x[ind,0:self.nChannel],x[ind_perm,self.nChannel:2*self.nChannel]),1))))))
+            self.logs.info(f'''x[ind,0:self.nChannel] shape : {x[ind,0:self.nChannel].shape},
+                x[ind_perm,self.nChannel:2*self.nChannel]shape : {x[ind_perm,self.nChannel:2*self.nChannel].shape},
+                the input_shape is : {x[ind,:].shape},
+                after the first layer the output shape is : {z2_first.shape},
+                after the second layer the output shape is : {z1_second.shape},
+                the third layer shape : {z2.shape}.
+                The original tensor is x: {y.shape}, after the forward pass the shae change into: {x.shape}
+                ''')
+            MI_lb += torch.mean(z1) - torch.log(torch.mean(torch.exp(z2)))
+
+        return MI_lb/self.bsize
