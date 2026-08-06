@@ -5,7 +5,9 @@ from pathlib import Path
 #import numpy as np
 #import yaml
 from typing import  Literal
+from collections.abc import Mapping
 import torch
+from torch import nn
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from timeit import default_timer as timer
 from contextlib import contextmanager
@@ -316,3 +318,79 @@ def permute_channel_layout(
         return image.permute(1, 2, 0)
 
     raise ValueError(f"Unsupported target_format: {target_format}")
+
+
+
+def check_same_device(*objects, 
+                      expected_device: torch.device | str | None = None
+                      ) -> torch.device:
+    """
+    Check that all tensors and nn.Module parameters inside the given objects
+    are on the same device.
+
+    Parameters
+    ----------
+    *objects
+        Any objects containing torch.Tensor, nn.Module, dict, list, tuple, etc.
+    expected_device : torch.device | str | None
+        If given, all tensors must be on this device. And then move them if not
+        If None, the first tensor/device found is used as reference.
+
+    Returns
+    -------
+    torch.device
+        The reference device.
+
+    Raises
+    ------
+    RuntimeError
+        If a device mismatch is found.
+    """
+    ref_device = torch.device(expected_device) if expected_device is not None else None
+    problems: list[str] = []
+
+    def visit(obj, path: str) -> None:
+        nonlocal ref_device
+
+        if obj is None:
+            return
+
+        if isinstance(obj, torch.Tensor):
+            if ref_device is None:
+                ref_device = obj.device
+            elif obj.device != ref_device:
+                problems.append(f"{path}: {obj.device} != {ref_device}")
+            return
+
+        if isinstance(obj, nn.Module):
+            for name, param in obj.named_parameters(recurse=True):
+                visit(param, f"{path}.{name}")
+            for name, buffer in obj.named_buffers(recurse=True):
+                visit(buffer, f"{path}.{name}")
+            return
+
+        if isinstance(obj, Mapping):
+            for key, value in obj.items():
+                visit(value, f"{path}[{repr(key)}]")
+            return
+
+        if isinstance(obj, (list, tuple)):
+            for i, value in enumerate(obj):
+                visit(value, f"{path}[{i}]")
+            return
+
+        # Ignora altri tipi: int, float, str, np.ndarray, ecc.
+
+    for i, obj in enumerate(objects):
+        visit(obj, f"arg{i}")
+
+    if ref_device is None:
+        raise RuntimeError("No torch.Tensor or nn.Module parameters found to check.")
+
+    if problems:
+        raise RuntimeError(
+            "Device mismatch detected:\n"
+            + "\n".join(f"  - {p}" for p in problems)
+        )
+
+    return ref_device
