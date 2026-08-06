@@ -322,7 +322,7 @@ def permute_channel_layout(
 
 
 def check_same_device(*objects, 
-                      expected_device: torch.device | str | None = None
+                      expected_device: torch.device | str | None = None,
                       ) -> torch.device:
     """
     Check that all tensors and nn.Module parameters inside the given objects
