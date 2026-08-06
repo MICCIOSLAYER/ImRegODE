@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 #import numpy as np
 #import yaml
-from typing import  Literal
+from typing import  Literal, Optional, Any
 from collections.abc import Mapping
 import torch
 from torch import nn
@@ -244,6 +244,40 @@ def deep_update(
 
     return merged
 
+
+def get_flatten_dict(complex_dict : dict,
+                 separator: str =  '.',
+                 final_key : Optional[str] = None
+                 )->dict[str, Any]:
+    '''
+    A function to flatten complex dict: 
+    Eg. complex_dict = {'first_layer': {'second_layer' : {'a': 1, 'b': 0}}}
+    
+
+    Args:
+        complex_dict (dict): the starting dict where some vals are dict themselves
+        separator (str. Default '.'): separator to use for define the final_key
+
+    Returns:
+        dict[str, Any]: flatetn dict. no nidificated dict:
+        Eg. flatten_dict = {'first_layer.second_layer.a' : 1, 'first_layer.second_layer.b': 0}
+    '''
+    
+    flatten_dict : dict[str, Any] = {}
+    
+    for k, v in complex_dict.items():
+        if final_key is None:
+            current_key = str(k)
+        else:
+            current_key = str(final_key) + separator + str(k)
+        
+        if  not isinstance(v, dict):
+            flatten_dict[current_key] = v
+        
+        else:
+            flatten_dict.update(get_flatten_dict(complex_dict=v, separator=separator, final_key = current_key))
+            
+    return flatten_dict
 
 
 def permute_channel_layout(
