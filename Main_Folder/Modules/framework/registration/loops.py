@@ -1,4 +1,4 @@
-# all useful for registration loop
+# all functions to be used inside the registration loop
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import  permute_channel_layout
 from Main_Folder.Modules.framework.preprocessing import normalize_img
