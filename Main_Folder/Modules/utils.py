@@ -5,6 +5,7 @@ from pathlib import Path
 #import numpy as np
 #import yaml
 from typing import  Literal, Optional, Any
+import numpy as np
 from collections.abc import Mapping
 import torch
 from torch import nn
@@ -205,7 +206,7 @@ def get_dirs_of(file_path : Path,
     return [image_type, image_deformation, file_name]
 
 # ======================================================================================
-#                                     OBJS UTILITIES
+#                                     OBJS UTILITIES(maintaining their nature)
 # ======================================================================================
 
 
@@ -428,3 +429,59 @@ def check_same_device(*objects,
         )
 
     return ref_device
+
+
+
+# ======================================================================================
+#                                     OBJS UTILITIES(converting their nature)
+# ======================================================================================
+
+def get_tensor(input: Any,
+               )->torch.Tensor:
+    '''
+    Generate a Tensor from a general input, if the input type is not handled yet it ha to be write down
+
+    Args:
+        input (Any): General input whose tensor is in need
+
+    Returns:
+        torch.Tensor: corresponding tensor of input data
+    '''
+    
+    if hasattr(input, 'image'):
+        return torch.Tensor(input.image)
+    if isinstance(input, np.ndarray):
+        return torch.from_numpy(input.astype(np.float32))
+    elif isinstance(input, torch.Tensor):
+        return input
+    else:
+        standard_log.warning(f'the data type {type(input)} is yet to be handled, introduce a new block to us it correctly')
+        raise TypeError(f'Unsupported Type{ type(input)}')
+
+
+
+def tensor_img_rgb2bn(imgrgb: torch.Tensor | np.ndarray,
+                      normalization_type: Literal['same',  'humansensitivity'] = 'same',
+                      )->torch.Tensor:
+    '''
+    convert a RGB torch tensor image to a grayscale torch tensor image
+    imgrgb in format (C, H, W) or  (B, C, H, W)
+    normalization_type: 'same' to keep the same width for each channel
+                        'humansensitivity' to use the human sensitivity ot each color channel: R: 0.2989, G: 0.5870, B: 0.1140
+    '''
+    if isinstance(imgrgb, np.ndarray):
+        imgrgb = torch.from_numpy(imgrgb)
+    img_rgb = imgrgb.squeeze().detach().cpu()
+    if img_rgb.ndim == 2: # single channel image
+        return img_rgb
+    elif img_rgb.ndim == 3 and img_rgb.shape[0] == 3: # multi-channel image
+        if normalization_type == 'same':
+            img_bn = img_rgb.mean(dim=0)
+        elif normalization_type == 'humansensitivity':
+            rgb_to_gray_sensitivity = torch.tensor([0.2989, 0.5870, 0.1140])
+            img_bn = torch.tensordot(permute_channel_layout(image=img_rgb, target_format='**C'), rgb_to_gray_sensitivity, dims=1)
+        else:
+            raise ValueError("normalization_type must be 'same' or 'humansensitivity'")
+    else:
+        raise ValueError(f'the input shape must be in (C, H, W) or (B, C, H, W), got {imgrgb.shape}')
+    return img_bn
