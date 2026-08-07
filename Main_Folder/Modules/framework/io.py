@@ -1,6 +1,9 @@
 # script to manage and to categorize all the input/output functions
+from typing import Union, Optional
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-
+from Main_Folder.Modules.utils import tensor_img_rgb2bn
+import torch
+from airlab.utils.image import Image as AirlabImage
 
 import os
 import py7zr
@@ -75,4 +78,27 @@ def get_dataset(
     standard_log.info(f'{dataset_name} has been successfully downloaded and extracted to {destination_path}')
     return None
 
-# ============= CATEGORIZE ELEMENTS FNS HERE ==================
+# =============     AIRLAB  ==================
+
+def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict)-> AirlabImage:
+    '''
+    Read an image producing the airlabImage type
+
+    Args:
+        image (Union[Path, torch.Tensor]): input image from dataset in Path or tensor type format
+        config_dict (dict): configuration dict from yaml file
+
+    Returns:
+        AirlabImage: _description_
+    '''
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if isinstance(image, Path):
+        image_airlab= AirlabImage.read(image, dtype=torch.float32, device=device)
+    else: # if isinstance(fixed_image, torch.Tensor) or isinstance(fixed_image, np.ndarray): # tensor type (1, 1, H, W) or (1, C, H, W)
+        ref_image=tensor_img_rgb2bn(image, normalization_type=config_dict['constant']['text-like']['img_normalization'])
+        sitk_input = ref_image.cpu() if torch.is_tensor(ref_image) and ref_image.is_cuda else ref_image
+        image_airlab = AirlabImage(
+            tensor_img_to_sitk(sitk_input),
+            torch.float32,
+            device)
+    return image_airlab
