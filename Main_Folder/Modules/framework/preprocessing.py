@@ -1,10 +1,11 @@
 # for preprocessing of various registration method
 
-from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union, Literal
+from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union, Literal, Any
 from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.framework.visualization import _image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
+from Main_Folder.Modules.utils import get_tensor
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
 import SimpleITK as sitk
@@ -456,3 +457,47 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
     sample_dict['test_pyramid'] = pyramid_moving
     sample_dict['nChannel'] = nChannel
     return sample_dict
+
+
+#==================
+#MASK IMAGES
+#==================
+
+
+def get_mask_from_image_intensity(img : Any,
+                                low_bound: float=-torch.inf,
+                                high_bound:float= torch.inf,
+                                inclusive_bound: bool = False,
+                                reversed_interval: bool = False,
+
+                                )->torch.Tensor:
+    '''
+    Generate a Image Mask from image
+
+    Args:
+        img (Any): image input data from which get thte mask
+        low_bound (float, optional): The lower bound to mark the pixel intensity as True. Defaults to -np.inf.
+        high_bound (float, optional): The higher bound to mark the pixel intensity as True. Defaults to np.inf.
+        inclusive (bool, optional): Flag to define if the boundary value has to be considered as a part of the bounding. Defaults to False.
+        reversed_interval (bool, optional): Flag to define if the masked True values must be the inside of the interval or the outside one
+    Returns:
+        torch.Tensor: the mask of the corresponding image, using the parameter given
+    '''
+    
+    input_tensor = get_tensor(input=img)
+    if inclusive_bound:
+        mask = (input_tensor >= low_bound) & (input_tensor <= high_bound)
+        if reversed_interval:
+            mask = (input_tensor <= low_bound) | (input_tensor >= high_bound)
+        
+    else:
+        mask = (input_tensor > low_bound) & (input_tensor < high_bound)
+        if reversed_interval:
+            mask = (input_tensor < low_bound) | (input_tensor > high_bound)
+        
+    if (low_bound == -torch.inf) and ( high_bound==torch.inf):
+        standard_log.info('the image mask correspond to the original image, since all values are included in -np.inf and np.inf')
+        return input_tensor
+    else:
+        return mask
+   
