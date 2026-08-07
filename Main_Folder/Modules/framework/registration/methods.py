@@ -1,3 +1,5 @@
+# Useful things on registration loops
+
 from typing import Union, Callable, Sequence, Optional, Dict, Any
 from tqdm.auto import tqdm
 import logging
