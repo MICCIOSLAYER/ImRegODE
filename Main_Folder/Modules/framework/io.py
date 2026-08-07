@@ -1,7 +1,8 @@
 # script to manage and to categorize all the input/output functions
 from typing import Union, Optional
+import SimpleITK as sitk
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import tensor_img_rgb2bn
+from Main_Folder.Modules.utils import tensor_img_rgb2bn, permute_channel_layout
 import torch
 from airlab.utils.image import Image as AirlabImage
 
@@ -9,6 +10,7 @@ import os
 import py7zr
 import requests
 import zipfile
+import numpy as np
 from pathlib import Path
 
 standard_log = get_logger(__name__)
@@ -78,7 +80,7 @@ def get_dataset(
     standard_log.info(f'{dataset_name} has been successfully downloaded and extracted to {destination_path}')
     return None
 
-# =============     AIRLAB  ==================
+#                                      =============     AIRLAB    ==================
 
 def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict)-> AirlabImage:
     '''
@@ -102,3 +104,28 @@ def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict)-> Airl
             torch.float32,
             device)
     return image_airlab
+
+#                                =============         SimpleITK             ==================
+
+def tensor_img_to_sitk(img : torch.Tensor | np.ndarray
+                       )-> sitk.Image:
+    '''
+    convert a torch tensor image to a SimpleITK image
+
+    Parameter
+    ---------
+    img: the input image to be converted (torch.Tensor or np.ndarray)
+    '''
+    if isinstance(img, torch.Tensor):
+        img = permute_channel_layout(image=img, target_format='**C').squeeze().detach().cpu().numpy()
+
+    if img.ndim == 2: 
+        return sitk.GetImageFromArray(img.astype(np.float32))
+    
+    if isinstance(img, np.ndarray) and img.shape[0] == 3: # multi-channel image
+       img = np.transpose(img, (1, 2, 0)) # change to (H, W, C) format
+
+    rgb_to_gray_sensitivity = [0.2898, 0.5870, 0.1140] # RGB to gray sensitivity
+    img = np.dot(img, rgb_to_gray_sensitivity) # convert to grayscale
+
+    return sitk.GetImageFromArray(img.astype(np.float32)) # convert to SimpleITK image
