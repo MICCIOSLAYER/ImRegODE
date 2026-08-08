@@ -9,7 +9,8 @@ from pathlib import Path
 from PIL import Image as PImage
 from typing import Union, Optional, Sequence
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import permute_channel_layout
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
+from Main_Folder.Modules.utils import permute_channel_layout, get_data_time
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
 
@@ -117,5 +118,31 @@ def show_images(image_list: Sequence[Image_Type] | Image_Type,
     plt.tight_layout()
     plt.show()
 
-
     return 
+
+
+def show_image_and_reference_points(image: torch.Tensor,
+                                    coordinates: list[list[float]],                                    
+                                    save_title : str = None,
+                                    uniform_color : bool = True,
+                                    ):
+    ''''''
+
+    
+    x_test = [test_point[0] for test_point in coordinates]
+    y_test = [test_point[1] for test_point in coordinates]
+    result_image_folder = FrameworkConfig().path_dict['RESULTS'] /'ImgRes'
+    plt.imshow(image.permute(1,2,0).detach().cpu().numpy())
+    plt.axis('off')
+    if not uniform_color:
+        colors = plt.cm.jet(np.linspace(0, 1, len(coordinates)))
+    else: 
+        colors = ['black'] * len(coordinates)
+    plt.scatter(x_test, y_test, c=colors, s=1)
+    if save_title is not None:
+        save_path=  Path(result_image_folder / f'{save_title}.png')
+        if save_path.exists():
+            save_path= Path(f'{save_path.split('.'[0])}_{get_data_time()}.png')
+        plt.savefig(save_path)
+        
+    
