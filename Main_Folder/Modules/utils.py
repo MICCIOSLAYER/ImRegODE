@@ -6,6 +6,7 @@ from pathlib import Path
 #import yaml
 from typing import  Literal, Optional, Any
 import numpy as np
+import SimpleITK as sitk
 from collections.abc import Mapping
 import torch
 from torch import nn
