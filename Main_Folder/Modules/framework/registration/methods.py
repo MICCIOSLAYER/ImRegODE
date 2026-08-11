@@ -4,9 +4,11 @@ from typing import Union, Callable, Sequence, Optional, Dict, Any
 from tqdm.auto import tqdm
 import logging
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from torch import nn
 import torch
-
+import SimpleITK as sitk
+from Main_Folder.Modules.utils import block_time
 from Main_Folder.Modules.framework.registration.networks import HomographyNet, MINE
 
 standard_log = get_logger(__name__)
@@ -125,3 +127,69 @@ def initialize_optimizer(
 
     return {'optimizer': optimizer,
             'scheduler': scheduler}
+
+
+
+# ==================================== SITK REGISTRATION METHODS ================================
+
+
+
+# MATTEs MUtual INformation: up to date to article parameters
+def MMI_SITK(reference_image: sitk.Image,
+            test_image: sitk.Image,
+            config_dict : dict | FrameworkConfig = None,
+              )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
+    '''
+    Mattes Mutual Information (MMI) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    reference_image : np.ndarray | torch.Tensor
+        The reference image.
+    test_image : np.ndarray | torch.Tensor
+        The test image.
+    config_dict : dict | FrameworkConfig
+        If the dict, it has to have the following keys at least: 
+        ['histo_bins', 'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
+    
+    Returns
+    -------
+    outTx : sitk.Transform
+        The resulting transformation to easly access the trasformation through sitk methods
+    registration : sitk.ImageRegistrationMethod
+        The registration object containing all the registration parameters and methods
+    registration_time_taken : float
+        The time taken for the registration process.
+    '''
+
+    if isinstance(config_dict, dict):
+        mmi_sitk_dict = config_dict
+    else:
+        mmi_sitk_dict = config_dict.registrations['simpleITK_original']['MMI']
+    
+    
+    samplingPercentage = float(mmi_sitk_dict['sampling_ratio'])
+    histogram_bins = int(mmi_sitk_dict['histo_bins'])
+    lr = float(mmi_sitk_dict['lr'])
+    n_iterations = float(mmi_sitk_dict['n_iterations'])
+    convergence_min_value = float(mmi_sitk_dict['convergenceMinimumValue'])
+    convergence_window_size = float(mmi_sitk_dict['convergenceWindowSize'])
+    # to get the transformation of the matrix
+    with block_time() as mattes_time:
+        registration = sitk.ImageRegistrationMethod()
+        registration.SetMetricAsMattesMutualInformation(numberOfHistogramBins=int(histogram_bins))  
+        registration.SetMetricSamplingPercentage(float(samplingPercentage), seed=sitk.sitkWallClock) 
+        registration.SetMetricSamplingStrategy(registration.RANDOM)
+        registration.SetOptimizerAsGradientDescent(learningRate=float(lr), numberOfIterations=int(n_iterations), convergenceMinimumValue=float(convergence_min_value), convergenceWindowSize=int(convergence_window_size) )
+        registration.SetOptimizerScalesFromPhysicalShift() # NOTE added as online suggestions
+        registration.SetInitialTransform(sitk.AffineTransform(reference_image.GetDimension()))  # Initial transform
+        registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+
+        #registration.AddCommand(sitk.sitkIterationEvent, lambda: command_iteration(registration)) # to get the iteration information while executing the cycle
+
+        # to get the transformation of the warped image:
+        outTx = registration.Execute(reference_image, test_image)  # Execute the registration
+    registration_time_taken = mattes_time[0]
+    # get information about the iteration cycle:
+
+    return outTx, registration, registration_time_taken
