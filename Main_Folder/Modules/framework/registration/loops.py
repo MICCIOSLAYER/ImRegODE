@@ -1,6 +1,6 @@
 # all functions to be used inside the registration loop
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import  permute_channel_layout
+from Main_Folder.Modules.utils import  permute_channel_layout, tensor_img_rgb2bn, get_tensor
 from Main_Folder.Modules.framework.preprocessing import normalize_img
 from Main_Folder.Modules.framework.postprocessing import get_warped_coords
 from Main_Folder.Modules.framework.data_classes import SampleDict
@@ -304,11 +304,63 @@ def loss_value_points(reference_points : list[tuple[int, int]],
             if reference_image.squeeze().ndim == 3: # nChannel==3
                 reference_image= permute_channel_layout(image=reference_image, target_format= 'C**')
                 warped_image= permute_channel_layout(image=warped_image, target_format= 'C**')
-                reference_value = torch.sum(reference_image[:, x_ref, y_ref]).item()
-                warped_value = torch.sum(warped_image[:, x_test, y_test]).item()
+                reference_value = torch.sum(reference_image[:, y_ref, x_ref]).item()
+                warped_value = torch.sum(warped_image[:, y_test, x_test]).item() # NOTE control for the ordere of x,y
 
             elif reference_image.squeeze().ndim == 2:
                 reference_value = reference_image[x_ref, y_ref].item()
                 warped_value = warped_image[x_test, y_test].item()
             loss += np.abs(reference_value - warped_value)
         return loss
+
+
+# loss on full images
+
+def loss_value_images(I : torch.Tensor,
+                      J : torch.Tensor,
+                      normalization : bool = True,
+                      )-> float:
+    ''' get the loss value between two images, normalizing if requested on N pixel
+    
+    Parameters
+    ----------
+    I, J (torch.Tensor): respecting the reference and the tested or warped image
+    normalization (bool): the flag to normalize on dimensions of images'''
+    if I.shape != J.shape:
+        raise ValueError("the two images must have the same shape")
+    else:
+
+        I_norm = normalize_img(I.squeeze())
+        J_norm = normalize_img(J.squeeze())
+        I_norm = tensor_img_rgb2bn(permute_channel_layout(image=I_norm, target_format='C**'))
+        J_norm = tensor_img_rgb2bn(permute_channel_layout(image=J_norm, target_format='C**'))
+        if normalization:
+            shape_normalizator = I.numel()
+            return torch.abs(I_norm - J_norm).sum()/shape_normalizator
+        else:
+            return torch.abs(I_norm - J_norm).sum()
+
+
+
+def mse_loss(img_fixed: np.ndarray | torch.Tensor,
+             img_moving: np.ndarray |torch.Tensor,
+             )-> torch.Tensor:
+    ''' get the mean squared error loss between two images
+    
+    Parameter:
+    img_fixed (np.ndarray | torch.Tensor): the fixed image
+    img_moving (np.ndarray | torch.Tensor): the moving image
+    
+    Returns:
+    float: the mean squared error loss between the two images, normalized over their size
+    '''
+
+    if img_fixed.shape != img_moving.shape:
+        raise ValueError("the two images must have the same shape")
+    img_fixed, img_moving = get_tensor(img_fixed), get_tensor(img_moving)
+    img_fixed = permute_channel_layout(get_tensor(img_fixed).squeeze(), target_format='**C')
+    img_moving = permute_channel_layout(get_tensor(img_moving).squeeze(), target_format='**C')
+
+    return torch.sum((img_fixed - img_moving)**2)/img_fixed.numel()
+
+
