@@ -3,6 +3,8 @@ import numpy as np
 import torch
 from typing import Sequence
 
+from Main_Folder.Modules.utils import get_tensor
+
 
 
 
@@ -41,3 +43,33 @@ def decrop_matrix(H: torch.Tensor,
     
     decropped_affine_matrix = np.matmul(np.matmul(np.linalg.inv(transformation_map_crop_to_full), H), transformation_map_crop_to_full)
     return torch.tensor(decropped_affine_matrix).to(H.device)
+
+
+def get_warped_coords(test_coords:torch.Tensor |np.ndarray, 
+                      affine_matrix: np.ndarray| torch.Tensor,
+                      )->tuple[list[int, int]]:
+    
+    '''Get the warped coordinates applying the homography matrix to the test coordinates
+    Parameters:
+    test_coords : torch.Tensor | np.ndarray
+        the coordinates to be transformed, shape (N, 2)
+    affine_matrix : torch.Tensor | np.ndarray
+        the homography matrix, shape (3, 3)
+        
+    Returns:
+    tuple[list[int, int]]
+        the transformed coordinates as list of integer tuples'''
+    ones = torch.ones(test_coords.shape[0], 1)
+    #print(f'ones is : \n{ones}  of shape {ones.shape}\n\n')
+    homogeneous_points = torch.cat([test_coords, ones], dim=1)
+    #print(f'homogeneous_points is : \n{homogeneous_points} of shape {homogeneous_points.shape}\n\n')
+    # Apply homography
+    affine_matrix = get_tensor(affine_matrix)
+    transformed_points = torch.matmul(homogeneous_points, affine_matrix.T)
+    #print(f'affine matrix is : \n{affine_matrix} of shape \t{affine_matrix.shape}\n\n')
+    #print(f'transformed_points are : \n{transformed_points} of shape \t{transformed_points.shape}\n\n')
+    # Convert back to Cartesian coordinates
+    transformed_points = transformed_points[:, :2] / transformed_points[:, 2].unsqueeze(1)
+    transformed_points_int_list = [[int(round(x)), int(round(y))] for x, y in transformed_points.tolist()]
+    
+    return transformed_points_int_list

@@ -2,6 +2,7 @@
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import  permute_channel_layout
 from Main_Folder.Modules.framework.preprocessing import normalize_img
+from Main_Folder.Modules.framework.postprocessing import get_warped_coords
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.framework.registration.networks import HomographyNet, MINE
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
@@ -235,3 +236,79 @@ def pyramid_loss(sample_dict: SampleDict,
 
     return total_loss, {'zii': zii, 
                         'zij': zij}
+
+# loss on points
+
+
+def loss_reference_points(reference_list : list[tuple[int, int]], # for I image
+                          homography_matrix : torch.Tensor,
+                          test_list : list[tuple[int, int]], # for J image
+                          ) -> float :
+    ''' given two list of coordinates, it get the euclidean distance between these two:
+    calculated as the difference between the test point and the affine transformation of the coordinate through the homography tensor
+    Args:
+        reference_list (list[[int, int]]): list of coordinate points of the image of reference
+        test_list (list[[int, int]]): list of coordinate points of the image to test the homography on
+        homography_matrix (torch.Tensor): homography matrix to apply to the reference points get by the homography_net/ loss 
+    '''
+    if len(reference_list) != len(test_list):
+        raise ValueError("The two lists must have the same length")
+    else:
+        loss = 0.0
+        test_coords = get_warped_coords(torch.Tensor(test_list), homography_matrix)
+        for i in range(len(reference_list)):
+            x_ref, y_ref = reference_list[i]
+            x_test, y_test = test_coords[i]
+            loss += np.sqrt((x_ref - x_test)**2 + (y_ref - y_test)**2)
+        return loss
+
+
+
+def loss_value_points(reference_points : list[tuple[int, int]],  
+                          test_points : list[tuple[int, int]], 
+                          reference_image : torch.Tensor, 
+                          warped_image : torch.Tensor,
+                          homography_matrix : torch.Tensor,
+                          ) -> float :
+    ''' 
+    given two list of coordinates(reference_points), 
+    it get the differences in values between the test image and the warped one in these coordinates
+
+    Assume that all the images both the fixed and the warped one are both of same shape and resulted from the dataloader,
+    ready to be processed by the net of shape [3, N ,N] or [N ,N]
+
+    Args:
+        reference_points (list[[int, int]]): list of coordinate points of the image of reference I
+
+        test_points (list[[int, int]]): list of coordinate points of the image to test the homography on J
+
+        homography_matrix (torch.Tensor): homography matrix to apply to the reference points get by the homography_net/ loss H
+
+        reference_image the image of reference I
+
+        warped_image the image to be tested J
+    '''
+    if len(reference_points) != len(test_points):
+        raise ValueError("The two lists must have the same length")
+    else:
+        loss = 0.
+        test_points = torch.Tensor(test_points,
+                                   device = homography_matrix.device,                                   
+                                   )
+        test_coords = get_warped_coords(test_points, homography_matrix)
+
+        for test_coord, reference_coord in zip(test_points, reference_points):
+            x_ref, y_ref = reference_coord 
+            x_test, y_test = test_coord
+
+            if reference_image.squeeze().ndim == 3: # nChannel==3
+                reference_image= permute_channel_layout(image=reference_image, target_format= 'C**')
+                warped_image= permute_channel_layout(image=warped_image, target_format= 'C**')
+                reference_value = torch.sum(reference_image[:, x_ref, y_ref]).item()
+                warped_value = torch.sum(warped_image[:, x_test, y_test]).item()
+
+            elif reference_image.squeeze().ndim == 2:
+                reference_value = reference_image[x_ref, y_ref].item()
+                warped_value = warped_image[x_test, y_test].item()
+            loss += np.abs(reference_value - warped_value)
+        return loss
