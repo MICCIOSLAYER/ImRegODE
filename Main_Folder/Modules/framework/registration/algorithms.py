@@ -1,14 +1,18 @@
 # all registration algorithms, it contains the complete wraps of registration, 
 # final products registration that give out result to be collected
-from typing import Sequence, Callable, Optional, Union
+from typing import Sequence, Callable, Optional, Union, Any
 from Main_Folder.Modules.framework.registration.methods import initialize_networks, initialize_optimizer
 import Main_Folder.Modules.framework.registration.networks 
+from Main_Folder.Modules.utils import block_time
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
 from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss, drmine_registration_loop
 from Main_Folder.Modules.framework.data_classes import SampleDict, FrameworkConfig
+from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
-import Main_Folder.Modules.utils  as utils
-
+from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk
+from Main_Folder.Modules.framework.evaluations import naed_evaluation
+import SimpleITK as sitk
+from pathlib import Path
 from tqdm.auto import tqdm
 from torch import nn
 import torch
@@ -24,7 +28,70 @@ standard_log = get_logger(__name__)
 #                                    =================================
 #                                            SITK REGISTRATION
 #                                    =================================
+def sitk_wrapper_for_registration(sample_dict: SampleDict, 
+                              config_dict: dict,
+                              sitk_registration_fn: Callable[[sitk.Image, sitk.Image, dict], tuple[Any, sitk.ImageRegistrationMethod, float]],
+                              
+                              )-> dict:
+    '''
+    A wrapper function to run the registration pipeline using SimpleITK. It takes a sample dictionary and a configuration dictionary as input and returns a dictionary containing the registration results.
 
+    Parameters
+    -------------
+        sample_dict (SampleDict): A dictionary containing the reference and test samples, their paths, and the sample name.
+        config_dict (dict): A dictionary containing configuration parameters for registration.
+        sitk_registration_fn (Callable): A function that performs the registration using SimpleITK:
+            INPUTs - sitk.Image, sitk.Image, dict
+            OUTPUTs - tuple[outTx{Any}, sitk.ImageRegistrationMethod, float]
+
+    Return
+    ------------
+        dict (dict): A dictionary containing the registration results, including the affine matrix, NAED value, and time taken for registration, mean for used in the data collector
+    '''
+    
+    reference_image = sample_dict['reference_sample']
+    test_image = sample_dict['test_sample']
+
+    if isinstance(reference_image, Path):
+        reference_sitk = sitk.ReadImage(reference_image, sitk.sitkFloat32)
+    elif isinstance(reference_image, torch.Tensor) or isinstance(reference_image, np.ndarray):
+        reference_sitk = tensor_img_to_sitk(reference_image)
+
+    if isinstance(test_image, Path):
+        test_sitk = sitk.ReadImage(test_image)
+    elif isinstance(test_image, torch.Tensor) or isinstance(test_image, np.ndarray):
+        test_sitk = tensor_img_to_sitk(test_image)
+
+    if reference_sitk.GetSize() != test_sitk.GetSize():
+            raise ValueError("The two images must have the same shape")
+    
+    
+    
+    sitk_transformation, registration_data, time_taken = sitk_registration_fn(reference_image = reference_sitk,
+                                                                            test_image = test_sitk,
+                                                                            config_dict = config_dict)
+    
+    #NOTE remember to use registration_data to get an affine matrix from get_affine_matric_from_sitk_transform
+    homography_matrix=get_affine_matrix_from_sitk_transform(sitk_transform=sitk_transformation)
+
+    naed_diagonal = naed_evaluation(image_couple_name=sample_dict['sample_name'],
+                                    affine_matrix=homography_matrix,
+                                    image_normalization='diagonal')
+    naed_norm_coord = naed_evaluation(image_couple_name=sample_dict['sample_name'],
+                                    affine_matrix=homography_matrix,
+                                    image_normalization='coords_norm')
+    
+
+    registration_results={}
+ 
+    #registration_results['registration_object']= registration_data NOTE not useful now
+    registration_results['naed_diagonal'] = naed_diagonal
+    registration_results['naed_coords'] = naed_norm_coord
+    registration_results['sitk_transformation'] =  sitk_transformation
+    registration_results['affine_matrix'] = homography_matrix
+    registration_results['time_taken'] = time_taken
+    
+    return registration_results
 
 
 #                                    =================================
@@ -130,7 +197,7 @@ def wrapper_drmine_registration_loop(
     
     optimizer = optim_init['optimizer']
     metric_history = {}
-    with utils.block_time() as timer:
+    with block_time() as timer:
         for i in pbar:
             optimizer.zero_grad()
             

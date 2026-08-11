@@ -142,3 +142,53 @@ def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME t
     plt.show()
     plt.close()
     return image_confrontation
+
+
+def get_affine_matrix_from_sitk_transform(sitk_transform: Union[sitk.AffineTransform,  ElastixParameterMap],
+                                          )-> torch.Tensor:
+    '''
+    get the homogeneous affine matrix from the SimpleITK transform object
+    as a torch.Tensor
+
+    H = | M t_eff |
+        | c   1   |
+        
+    where t_eff = t + c - M @ c as effective translation considering the center of rotation
+    and M is the rotation matrix, t is the translation vector, c is the center of rotation
+    
+    Parameters:
+    -----------
+    
+    sitk_transform : sitk.AffineTransform
+        the SimpleITK affine transform object from which to extract the homogeneous affine matrix
+    
+    Returns:
+    --------
+        H_matrix : torch.Tensor
+        the homogeneous affine matrix as a torch.Tensor of shape (dim+1, dim+1
+    '''
+    if isinstance(sitk_transform, ElastixParameterMap):
+        H = np.eye(3)
+        a11, a12, a21, a22, tx, ty =  sitk_transform.GetParameterMap(0)['TransformParameters']
+        
+        H[0, 0] = float(a11)
+        H[0, 1] = float(a12)
+        H[1, 0] = float(a21)
+        H[1, 1] = float(a22)
+        H[0, 2] = float(tx)
+        H[1, 2] = float(ty)
+        return torch.Tensor(H)
+    dim = sitk_transform.GetDimension()
+    M = np.array(sitk_transform.GetMatrix(), dtype=float).reshape((dim, dim))
+    t = np.array(sitk_transform.GetTranslation(), dtype=float)
+    c = np.array(sitk_transform.GetCenter(), dtype=float)  
+
+    # compute the effective translation considering the center of rotation
+    t_eff = t + c - M @ c
+    # construct the homogeneous affine matrix
+    H = torch.eye(dim + 1, dtype=torch.float32)
+    H[:dim, :dim] = torch.Tensor(M)
+    H[:dim, dim] = torch.Tensor(t_eff)
+
+
+    return H
