@@ -1,10 +1,15 @@
 # all function for post processing results and preparations for evaluation
 import numpy as np
 import torch
+import SimpleITK as sitk
+import sys
 from typing import Sequence
-
+import matplotlib.pyplot as plt
+from pathlib import Path
 from Main_Folder.Modules.utils import get_tensor
 
+from Main_Folder.Modules.framework.img_io import tensor_img_to_sitk
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 
 
 
@@ -73,3 +78,67 @@ def get_warped_coords(test_coords:torch.Tensor |np.ndarray,
     transformed_points_int_list = [[int(round(x)), int(round(y))] for x, y in transformed_points.tolist()]
     
     return transformed_points_int_list
+
+
+# ==================== SITK PORSTPROCESSING ======================
+
+
+def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME to be adjusted to wrappers, preprocessing, dataset and config_dict
+                   image_test : sitk.Image | torch.Tensor,
+                   outTx : sitk.Transform,
+                   interpolator = sitk.sitkLinear,
+                   default_pxv : int = 100,
+                   save_image: bool = False,
+                   folder_path: Path = FrameworkConfig().path_dict['IMG_RESULTS'], 
+                   name: str = 'image_sitk'                  
+                   )-> sitk.Image:
+    '''
+    get the warped image and the fixed image from the SimpleITK images and the transformation matrix to return a visual confrontation of the differences in between
+
+    Args:
+        image_ref (sitk.Image | torch.Tensor): input image as reference
+        image_test (sitk.Image | torch.Tensor): input image as the warped one
+        outTx (sitk.Transform): trasformation of sitk
+        interpolator (_type_, optional): interpolator to pass from discrete to conituous data. Defaults to sitk.sitkLinear.
+        default_pxv (int, optional): Default pixel values for SetDefaultPixelValue method of resampler . Defaults to 100.
+        visualize (bool, optional): flag to save confrontation. Defaults to False.
+        folder_path (Path, optional): folder path to save image confrontation. Defaults to FrameworkConfig().path_dict['IMG_RESULTS'].
+        name (str, optional): name image. Defaults to 'A01_sitk'.
+
+    Returns:
+        sitk.Image: _description_
+    '''
+    IN_COLAB = 'google.colab' in sys.modules
+    if isinstance(image_ref, torch.Tensor):
+        image_ref = tensor_img_to_sitk(image_ref)
+    if isinstance(image_test, torch.Tensor):
+        image_test = tensor_img_to_sitk(image_test)
+
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(image_ref)  # Set the reference image
+    resampler.SetTransform(outTx)  # Set the transformation
+    resampler.SetInterpolator(interpolator)  # Set the interpolator
+    resampler.SetDefaultPixelValue(default_pxv)  # Set the default pixel value
+
+    outcome_image = resampler.Execute(image_test)  # Execute the resampling
+    sigm1 = sitk.Cast(sitk.RescaleIntensity(outcome_image), sitk.sitkUInt8)
+    sigm2 = sitk.Cast(sitk.RescaleIntensity(image_ref), sitk.sitkUInt8)
+    image_confrontation = sitk.Compose(sigm1, sigm2, sigm1//2.0 + sigm2//2.0)  # Compose the two images
+
+
+    array_image = sitk.GetArrayFromImage(image_confrontation)  # Convert to numpy array for visualization
+    if array_image.shape[0] in (1, 3):  # se è un'immagine monocromatica o RGB
+        array_image = np.moveaxis(array_image, 0, -1)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(array_image)
+    plt.axis('off')
+    plt.title("Warped and Fixed Image")
+    if save_image:
+        if IN_COLAB:
+            plt.savefig(folder_path/f'{name}.png', dpi=150, bbox_inches='tight')
+            
+        else:
+            plt.savefig(folder_path / f'{name}.png')
+    plt.show()
+    plt.close()
+    return image_confrontation
