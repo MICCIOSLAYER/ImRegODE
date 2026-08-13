@@ -2,15 +2,18 @@
 import matplotlib.pyplot as plt
 import torch
 import SimpleITK as sitk
+import sys
 import itk
 from airlab.utils import Image as AirlabImage
+from airlab.transformation.utils import warp_image
 import numpy as np
 from pathlib import Path
+from datetime import datetime
 from PIL import Image as PImage
-from typing import Union, Optional, Sequence
+from typing import Union, Optional, Sequence, Any
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
-from Main_Folder.Modules.utils import permute_channel_layout, get_data_time
+from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
 
@@ -145,4 +148,90 @@ def show_image_and_reference_points(image: torch.Tensor,
             save_path= Path(f'{save_path.split('.'[0])}_{get_data_time()}.png')
         plt.savefig(save_path)
         
+
+
+def airlab_show_image_differencies(reference_image: AirlabImage,
+                                   test_image: AirlabImage,
+                                   airlab_transformation: Union[torch.nn.Module, Any],
+                                   config_dict : dict | FrameworkConfig,
+                                   save_images: Union[Path, bool] = False,
+                                   
+                                   )->Optional[Path]:
+    '''
+    Shoe & Save images confrontation to get a visual impact on results
+
+    Args:
+        reference_image (AirlabImage): ground truth of registration
+        test_image (AirlabImage): the deformed image, to be registred or to be warped
+        airlab_transformation (Union[nn.Module, Any]): basically the warping transformation obatined by the registration
+        save_images (Union[bool, Path]): Define if save it or not in a specified path otherwise it will be placed in ImRes folder inside repos. Defaults to False.
+        config_dict: dict | FrameworkConfig: the space in which there are the information on metric sigma, n_histo_bin, n_iteration, lr
+
+    Returns:
+        Optional[Path]: the path of the saved image if save_images is True, otherwise None
+    '''
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    IN_COLAB = 'google.colab' in sys.module
+    if isinstance(config_dict, dict):
+        airlab_dict=config_dict
+        imagedir_save_path = config_dict.get('save_path', save_images)
+    else:
+        airlab_dict= config_dict.registrations['airlab']
+        imagedir_save_path = config_dict.path_dict['IMG_RESULTS']
+
+    metric_sigma = airlab_dict['metric_sigma']
+    metric_num_bins = airlab_dict['histo_bins']
+    num_iterations= airlab_dict['n_iterations']
+    learning_rate= airlab_dict['lr']
+    PROJECT_PATH = get_root_path()
+
     
+
+
+    prior_reg = np.abs(reference_image.numpy() - test_image.numpy())
+    if hasattr(airlab_transformation, 'get_displacement'):
+        displacement_field = airlab_transformation.get_displacement()
+        after_reg = np.abs(reference_image.numpy() - warp_image(test_image, displacement_field).numpy())
+    #========== RESULTS================ show_save_image
+    
+    save_time=datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_name = f'AMI_sigma{metric_sigma}_niter{num_iterations}_bins{metric_num_bins}_lr{learning_rate}__{save_time}.png'
+    
+    
+    
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].set_title('Original Difference')
+    ax[0].imshow(prior_reg, cmap='gray')
+    ax[0].axis('off')
+    ax[1].set_title('Warped Difference')
+    ax[1].imshow(after_reg, cmap='gray')
+    ax[1].axis('off')
+
+   
+
+    if isinstance(save_images, Path) and save_images.exists():
+        saving_path = save_images / save_name
+    elif not save_images:
+        return saving_path
+    else:
+        saving_path = Path(imagedir_save_path) / save_name
+
+
+
+    if IN_COLAB:
+        saving_path = Path(f'/content/drive/MyDrive/Results/{save_name}')
+        if saving_path.exists():
+            saving_path = saving_path.parent / f'{save_time}.png'
+        fig.savefig(saving_path,
+                    dpi=150,
+                    bbox_inches='tight',
+                    pad_inches=0.1)
+    else:
+        if saving_path.exists():
+            saving_path = saving_path.parent / f'{save_time}.png'
+        fig.savefig(saving_path)
+    plt.show()
+    plt.close(fig)
+        
+    
+    return saving_path
