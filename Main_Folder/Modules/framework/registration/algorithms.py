@@ -9,17 +9,23 @@ from Main_Folder.Modules.framework.registration.loops import multi_resolution_lo
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
-from Main_Folder.Modules.framework.preprocessing import general_preprocessing
+from Main_Folder.Modules.framework.preprocessing import general_preprocessing, airlab_mask_configuration
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
-from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk
+from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk, airlab_read_image
 from Main_Folder.Modules.framework.evaluations import naed_evaluation
 import SimpleITK as sitk
+from airlab.utils.image import Image as AirlabImage
+from airlab.registration import PairwiseRegistration
+from airlab.transformation.pairwise import AffineTransformation
+from airlab.loss.pairwise import MI
+from airlab.transformation.utils import warp_image
 from pathlib import Path
 from tqdm.auto import tqdm
 from itertools import islice
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
 import torch
+import itk
 import numpy as np
 
 
@@ -101,12 +107,126 @@ def sitk_wrapper_for_registration(sample_dict: SampleDict,
 #                                    =================================
 #                                           ELASTIX REGISTRATION
 #                                    =================================
+def elastix_wrapper_for_registration(sample_dict: SampleDict,
+                                     config_dict: dict | FrameworkConfig,
+                                     elastix_registration_fn: Callable[[SampleDict, dict], dict],
+                                     )-> dict:
+    '''
+    Wrapper function for elastix registration. It takes a sample dictionary and a configuration dictionary, and
+    returns a dictionary containing the registration results and parameters.
+    Parameters
+    ----------
+    sample_dict : SampleDict
+        The sample dictionary containing the image paths.
+    config_dict : dict, FrameworkConfig
+        The configuration dictionary for the registration.
+    
+    Returns
+    -------
+    dict
+        A dictionary containing the registration results and parameters.
+    '''
+    
+    test_image = itk.imread(sample_dict['test_sample_path'], itk.F)
+    reference_image = itk.imread(sample_dict['reference_sample_path'], itk.F)
+    
+
+
+    itk_registration, time_taken, registred_image = elastix_registration_fn(reference_image=reference_image,
+                                                           test_image=test_image,
+                                                           config_dict=config_dict)
+    homography_matrix = get_affine_matrix_from_sitk_transform(sitk_transform=itk_registration)
+
+    naed_diagonal = naed_evaluation(image_couple_name=sample_dict['sample_name'],
+                                    affine_matrix=homography_matrix,
+                                    image_normalization='diagonal')
+    naed_norm_coord = naed_evaluation(image_couple_name=sample_dict['sample_name'],
+                                    affine_matrix=homography_matrix,
+                                    image_normalization='coords_norm')
+    
+    registration_results={}
+    registration_results['registered_image']= registred_image
+    registration_results['homography_matrix'] = homography_matrix
+    registration_results['time_taken'] = time_taken
+    registration_results['naed_diagonal'] = naed_diagonal
+    registration_results['naed_norm_coord'] = naed_norm_coord
+
+    return registration_results
 
 
 
 #                                    =================================
 #                                            AIRLAB REGISTRATION
 #                                    =================================
+
+def airlab_wrapprer_for_registration(sample_dict:SampleDict,
+                                     config_dict:dict | FrameworkConfig,
+                                     airlab_registration_fn: Callable[[AirlabImage, AirlabImage, dict], dict],
+                                     )-> dict:
+    '''
+    Wrapper forfor airlab registration loop -type it uniform registration loops to take the same inputs and give out the results 
+    as a dict to be easily put in Data Collector
+
+    Args:
+        sample_dict (SampleDict): Dictionary containing main information about samples
+        config_dict (dict, FrameworkConfig): configuration dictionary containing all the parameters for the registration
+            if a dict mandatory to have the following keys: 'masked' with a bool value
+                                                            also see the registrationfn in the standard it has to have
+        airlab_registration_fn (_type_): registration function following specs of airlab
+
+    Returns:
+        dict: registration results of airlab_registration_fn
+    '''
+    if isinstance(config_dict, dict):
+        airlab_config_dict = config_dict
+    else:
+        airlab_config_dict= config_dict.registrations['airlab']
+
+    
+    #===========READ IMAGES============
+    if 'reference_sample_path' in sample_dict:
+        airlab_reference_image = airlab_read_image(sample_dict['reference_sample_path'])
+    elif 'reference_sample' in sample_dict:
+        airlab_reference_image = airlab_read_image(sample_dict['reference_sample'])
+
+    if 'test_sample_path' in sample_dict:
+        airlab_test_image = airlab_read_image(sample_dict['test_sample_path'])
+    elif 'test_sample' in sample_dict:
+        airlab_test_image = airlab_read_image(sample_dict['test_sample'])
+    
+    if airlab_config_dict['masked']:
+
+        airlab_reference_mask, airlab_test_mask = airlab_mask_configuration(reference_image_airlab=airlab_reference_image,
+                                                                test_image_airlab=airlab_test_image,
+                                                                config_dict=config_dict)
+        
+        affine_matrix, registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                                                reference_mask = airlab_reference_mask,
+                                                                                test_mask=airlab_test_mask,
+                                                                                moved_image=airlab_test_image,
+                                                                                config_dict=config_dict,
+                                                                              )
+    else:
+        affine_matrix, registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                                                moved_image=airlab_test_image,
+                                                                                config_dict=config_dict,
+                                                                                )
+    image_name_couple = sample_dict['sample_name']
+    naed_diagonal = naed_evaluation(image_couple_name=image_name_couple,
+                                affine_matrix=affine_matrix,
+                                image_normalization='diagonal')
+    naed_norm_coord = naed_evaluation(image_couple_name=image_name_couple,
+                                affine_matrix=affine_matrix,
+                                image_normalization='coords_norm')
+    
+    registration_data['naed_diagonal'] = naed_diagonal
+    registration_data['naed_coords'] = naed_norm_coord
+    registration_data['affine_matrix'] = affine_matrix.detach().cpu().numpy()
+
+
+
+    
+    return registration_data
 
 
 
