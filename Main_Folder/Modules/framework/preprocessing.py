@@ -500,4 +500,67 @@ def get_mask_from_image_intensity(img : Any,
         return input_tensor
     else:
         return mask
-   
+
+# airlab mask
+
+def airlab_mask_from_image(img_airlab:AirlabImage, 
+                           low: float=-torch.inf, 
+                           high:float=torch.inf,
+                           )->AirlabImage:
+    '''
+    Using the fns for recreate a mask from an input image in the airlab image format
+
+    Args:
+        img_airlab (AirlabImage): input image from which the mask is formed
+        low (float, optional): Lower bound of mask acceptance interval. Default to -torch.inf
+        high (float, optional): Upper bound of mask acceptance interval. Default to torch.inf
+
+    Returns:
+        AirlabImage: mask of img_airlab , following the img_airlab input format 
+    '''
+    logs=logging.getLogger(__name__)
+
+    mask = get_mask_from_image_intensity(
+        img=get_tensor(input=img_airlab), 
+        low_bound=low, 
+        high_bound=high, 
+        inclusive_bound=False, 
+        reversed_interval=False)
+
+
+def airlab_mask_configuration(reference_image_airlab: AirlabImage,
+            test_image_airlab: AirlabImage,
+            config_dict: dict| FrameworkConfig,
+            
+            )->Tuple[AirlabImage, AirlabImage]:
+    '''
+    Function to create a mask for airlab
+
+
+    Args:
+        reference_image_airlab (AirlabImage): The reference image.
+        test_image_airlab (AirlabImage): The test image.
+        config_dict (dict | FrameworkConfig): A dictionary containing configuration parameters for preprocessing.
+            if dict, mandatory to have thefollowing keys: 'background_min', 'background_max'
+
+    Returns:
+        tuple[AirlabImage, AirlabImage]: The masked reference and test images.
+    '''
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if isinstance(config_dict, dict):
+        airlab_config_dict = config_dict
+    else:
+        airlab_config_dict = config_dict.registrations['airlab']
+    
+    min_allowed_val =airlab_config_dict['background_min']
+    max_allowed_val = airlab_config_dict['background_max']
+
+    reference_mask_airlab = airlab_mask_from_image(reference_image_airlab, low=min_allowed_val, high=max_allowed_val)
+    test_mask_airlab = airlab_mask_from_image(test_image_airlab, low=min_allowed_val, high=max_allowed_val)
+
+
+    reference_image_airlab=reference_mask_airlab.image.to(device)
+    test_image_airlab=test_mask_airlab.image.to(device)
+
+    return reference_image_airlab, test_image_airlab
+
