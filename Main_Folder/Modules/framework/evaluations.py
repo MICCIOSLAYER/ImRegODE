@@ -190,4 +190,57 @@ def joint_histogram_mutual_information(image1, image2):
 
     # NOTE dal notebook:
     return np.sum(pxy[nzs] * np.log(pxy[nzs] / px_py[nzs])) # this is the original one
-    
+
+
+# NCC NORMALIZED CROSS CORRELATION: fai un canale alla volta, 
+# per le immagini RGB usa la somma ed eventualmente una nuova normalizzazione
+#  per avere una versione da -1 +1
+def normalized_cross_correlation(
+        image1: torch.Tensor | np.ndarray,
+        image2: torch.Tensor | np.ndarray
+        ) -> float: 
+        
+    """
+    Calculate the normalized cross-correlation (NCC) between two images.
+
+    Parameters:
+    -----------
+    image1 : np.ndarray | torch.Tensor
+        The first image (grayscale or RGB).
+    image2 : np.ndarray | torch.Tensor
+        The second image (grayscale or RGB).
+
+    Returns:
+    --------
+    float
+        The normalized cross-correlation value.
+    """
+    if type(image1) != type(image2):
+        raise TypeError("the two images must have the same type")
+    elif isinstance(image1, torch.Tensor):
+        pass
+        
+    elif isinstance(image1, np.ndarray):
+        pass
+
+    # Convert images to grayscale if they are RGB or simply or simply use the sum of the nmi over the color channels ?
+    if image1.ndim == 3:
+        image1 = rgb2gray(image1)
+    if image2.ndim == 3:
+        image2 = rgb2gray(image2)
+
+    # Compute the mean of each image
+    mean1 = np.mean(image1)
+    mean2 = np.mean(image2)
+
+    # Compute the numerator and denominator for NCC
+    numerator = np.sum((image1 - mean1) * (image2 - mean2))
+    denominator = np.sqrt(np.sum((image1 - mean1) ** 2) * np.sum((image2 - mean2) ** 2))
+
+    # Avoid division by zero
+    if denominator == 0:
+        return 0
+
+    ncc = numerator / denominator
+
+    return ncc
