@@ -38,6 +38,9 @@ standard_log = get_logger(__name__)
 #                                    =================================
 #                                            SITK REGISTRATION
 #                                    =================================
+
+#-------------------------------------------WRAPPER-------------------------------------------
+
 def sitk_wrapper_for_registration(sample_dict: SampleDict, 
                               config_dict: dict,
                               sitk_registration_fn: Callable[[sitk.Image, sitk.Image, dict], tuple[Any, sitk.ImageRegistrationMethod, float]],
@@ -104,9 +107,309 @@ def sitk_wrapper_for_registration(sample_dict: SampleDict,
     return registration_results
 
 
+#-------------------------------------------REGISTRATION FNS-------------------------------------------
+
+
+def MMI_SITK(reference_image: sitk.Image,
+            test_image: sitk.Image,
+            config_dict : dict | FrameworkConfig = None,
+              )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
+    '''
+    Mattes Mutual Information (MMI) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    reference_image : np.ndarray | torch.Tensor
+        The reference image.
+    test_image : np.ndarray | torch.Tensor
+        The test image.
+    config_dict : dict | FrameworkConfig
+        If the dict, it has to have the following keys at least: 
+        ['histo_bins', 'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
+    
+    Returns
+    -------
+    outTx : sitk.Transform
+        The resulting transformation to easly access the trasformation through sitk methods
+    registration : sitk.ImageRegistrationMethod
+        The registration object containing all the registration parameters and methods
+    registration_time_taken : float
+        The time taken for the registration process.
+    '''
+
+    if isinstance(config_dict, dict):
+        mmi_sitk_dict = config_dict
+    else:
+        mmi_sitk_dict = config_dict.registrations['simpleITK_original']['MMI']
+    
+    
+    samplingPercentage = float(mmi_sitk_dict['sampling_ratio'])
+    histogram_bins = int(mmi_sitk_dict['histo_bins'])
+    lr = float(mmi_sitk_dict['lr'])
+    n_iterations = float(mmi_sitk_dict['n_iterations'])
+    convergence_min_value = float(mmi_sitk_dict['convergenceMinimumValue'])
+    convergence_window_size = float(mmi_sitk_dict['convergenceWindowSize'])
+    # to get the transformation of the matrix
+    with block_time() as mattes_time:
+        registration = sitk.ImageRegistrationMethod()
+        registration.SetMetricAsMattesMutualInformation(numberOfHistogramBins=int(histogram_bins))  
+        registration.SetMetricSamplingPercentage(float(samplingPercentage), seed=sitk.sitkWallClock) 
+        registration.SetMetricSamplingStrategy(registration.RANDOM)
+        registration.SetOptimizerAsGradientDescent(learningRate=float(lr), numberOfIterations=int(n_iterations), convergenceMinimumValue=float(convergence_min_value), convergenceWindowSize=int(convergence_window_size) )
+        registration.SetOptimizerScalesFromPhysicalShift() # NOTE added as online suggestions
+        registration.SetInitialTransform(sitk.AffineTransform(reference_image.GetDimension()))  # Initial transform
+        registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+
+        #registration.AddCommand(sitk.sitkIterationEvent, lambda: command_iteration(registration)) # to get the iteration information while executing the cycle
+
+        # to get the transformation of the warped image:
+        outTx = registration.Execute(reference_image, test_image)  # Execute the registration
+    registration_time_taken = mattes_time[0]
+    # get information about the iteration cycle:
+
+    return outTx, registration, registration_time_taken
+
+
+
+def centred_NCC_SITK(reference_image: np.ndarray | torch.Tensor | Path,
+                     test_image: np.ndarray | torch.Tensor | Path,
+                     config_dict:dict,)-> tuple: # NOTE see the output
+    '''
+    Mattes Mutual Information (MMI) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    reference_image : np.ndarray | torch.Tensor
+        The fixed image.
+    test_image : np.ndarray | torch.Tensor
+        The warped image.
+
+    
+    Returns
+    -------
+    float
+        The Normalized Mutual Information value.
+    '''
+    ncc_centred_dict = config_dict['registrations']['simpleITK_original']['NCC_centred']
+    
+    with block_time() as ncc_time:
+        # to get the transformation of the matrix
+        registration = sitk.ImageRegistrationMethod()
+        registration.SetMetricAsCorrelation()  
+        registration.SetOptimizerAsRegularStepGradientDescent(
+            learningRate=ncc_centred_dict['lr'],
+            minStep=ncc_centred_dict['min_step'],
+            numberOfIterations=ncc_centred_dict['n_iterations'],
+            gradientMagnitudeTolerance=ncc_centred_dict['gradientMagnitudeTolerance'],
+        )
+        registration.SetOptimizerScalesFromIndexShift()
+        
+        transformation = sitk.CenteredTransformInitializer( reference_image, test_image, sitk.AffineTransform(reference_image.GetDimension())) # TRY to use operation_mode = MOMENTS
+        registration.SetInitialTransform(transformation)
+
+        registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+        out_tx = registration.Execute(reference_image, test_image)  # Execute the registration
+    time_taken = ncc_time[0]
+    
+
+    # get information about the iteration cycle:
+
+    return out_tx, registration, time_taken
+
+
+
+def JHMI_SITK(reference_image: sitk.Image,
+              test_image: sitk.Image,
+              config_dict:dict,
+              )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
+    '''
+    Mattes Mutual Information (MMI) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    reference_image : np.ndarray | torch.Tensor
+        The reference image.
+    test_image : np.ndarray | torch.Tensor
+        The test image.
+
+    
+    Returns
+    -------
+    float
+        The Normalized Mutual Information value.
+    '''
+
+
+    # normalization & Gaussian smoothing:
+    #reference_image = sitk.DiscreteGaussian(sitk.Normalize(reference_image), 2.0) #removed since not present in the article
+    #test_image = sitk.DiscreteGaussian(sitk.Normalize(test_image), 2.0) #removed since not present in the article
+    jhmi_sitk_dict= config_dict['registrations']['simpleITK_original']['JHMI']
+    samplingPercentage = jhmi_sitk_dict['sampling_ratio']
+    lr = jhmi_sitk_dict['lr']
+    n_iterations = jhmi_sitk_dict['n_iterations']
+    convergence_min_value = jhmi_sitk_dict['convergenceMinimumValue']
+    convergence_window_size = jhmi_sitk_dict['convergenceWindowSize']
+    histo_bins = jhmi_sitk_dict['histo_bins']
+    
+    with block_time() as jhmi_time:
+    # to get the transformation of the matrix
+        registration = sitk.ImageRegistrationMethod()
+        registration.SetMetricAsJointHistogramMutualInformation(numberOfHistogramBins=histo_bins)  
+        registration.SetOptimizerAsGradientDescent( #NOTE try also with SetOptimzerAsGradientDescent otherwise it will take 16min
+            learningRate=lr,
+            numberOfIterations=n_iterations,
+            convergenceMinimumValue=convergence_min_value,
+            convergenceWindowSize=convergence_window_size,
+        )
+        registration.SetInitialTransform(sitk.AffineTransform(reference_image.GetDimension()))  # Initial transform
+        registration.SetMetricSamplingStrategy(registration.RANDOM)
+        registration.SetMetricSamplingPercentage(samplingPercentage)  # 50% sampling
+        registration.SetOptimizerScalesFromPhysicalShift() # NOTE added as online suggestions
+        registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+        out_tx = registration.Execute(reference_image, test_image)  # Execute the registration 
+    time_taken = jhmi_time[0]  
+
+    return out_tx, registration, time_taken
+
+
+
+# Mean Squared Error:
+def MSE_SITK( reference_image: sitk.Image,
+              test_image: sitk.Image,
+              config_dict : dict,
+              )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
+    '''
+    Mean Squared Error (MMI) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    fixed_image : np.ndarray | torch.Tensor
+        The fixed image.
+    warped_image : np.ndarray | torch.Tensor
+        The warped image.
+
+    
+    Returns
+    -------
+    float
+        The Normalized Mutual Information value.
+    '''
+    mse_sitk_dict = config_dict['registrations']['simpleITK_original']['MSE']
+    samplingPercentage = mse_sitk_dict['sampling_ratio']
+    lr = mse_sitk_dict['lr']
+    n_iterations = mse_sitk_dict['n_iterations']
+    convergence_min_value = mse_sitk_dict['convergenceMinimumValue']
+    convergence_window_size = mse_sitk_dict['convergenceWindowSize']
+    
+    with block_time() as mse_time:
+        # to get the transformation of the matrix
+        registration = sitk.ImageRegistrationMethod()
+
+        registration.SetMetricAsMeanSquares()  
+        registration.SetOptimizerAsGradientDescent(
+            learningRate = lr,
+            numberOfIterations = n_iterations,
+            convergenceMinimumValue = convergence_min_value,
+            convergenceWindowSize = convergence_window_size,
+
+        )
+        registration.SetInitialTransform(sitk.AffineTransform(reference_image.GetDimension()))  # Initial transform
+        registration.SetOptimizerScalesFromPhysicalShift()
+        registration.SetMetricSamplingStrategy(registration.RANDOM)
+        registration.SetMetricSamplingPercentage(samplingPercentage)  # 50% sampling
+        registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+        out_tx = registration.Execute(reference_image, test_image)  # Execute the registration   
+    time_taken = mse_time[0]
+    return out_tx, registration, time_taken
+
+
+
+def NCC_SITK(reference_image: sitk.Image,
+             test_image:  sitk.Image,
+             config_dict: dict,
+           )-> tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
+    '''
+    Registration of two images using Normalized Cross Correlation (NCC) of SimpleITK as metric.
+    
+    Parameters
+    ----------
+    fixed_image : np.ndarray | torch.Tensor
+        The fixed image.
+    warped_image : np.ndarray | torch.Tensor
+        The warped image.
+    
+    Returns
+    -------
+    float
+        The normalized cross correlation value.
+    '''
+    ncc_sitk_dict = config_dict['registrations']['simpleITK_original']['NCC']
+    samplingPercentage = ncc_sitk_dict['sampling_ratio']
+    lr = ncc_sitk_dict['lr']
+    n_iterations = ncc_sitk_dict['n_iterations']
+    convergence_min_value = ncc_sitk_dict['convergenceMinimumValue']
+    convergence_window_size = ncc_sitk_dict['convergenceWindowSize']
+    # to get the transformation of the matrix
+    registration = sitk.ImageRegistrationMethod()
+    registration.SetMetricAsCorrelation()  # NCC metric
+    registration.SetMetricSamplingPercentage(samplingPercentage, seed=sitk.sitkWallClock) # NOTE see if optional or a must
+    registration.SetMetricSamplingStrategy(registration.RANDOM) #NOTE not defined in the article
+    registration.SetOptimizerAsGradientDescent(learningRate=lr, convergenceMinimumValue=convergence_min_value, convergenceWindowSize=convergence_window_size, numberOfIterations=n_iterations) 
+    registration.SetOptimizerScalesFromPhysicalShift() # NOTE added as online suggestions
+    registration.SetInitialTransform(sitk.AffineTransform(reference_image.GetDimension()))  # Initial transform
+    registration.SetInterpolator(sitk.sitkLinear)  # Interpolator
+
+    #    registration.AddCommand(sitk.sitkIterationEvent, lambda: command_iteration(registration)) # to get the iteration information while executing the cycle
+    with block_time() as ncc_time:
+        # to get the transformation of the warped image:
+        outTx = registration.Execute(reference_image, test_image)  # Execute the registration
+    time_taken = ncc_time[0]
+    return outTx, registration, time_taken
+
+
+
+def ncc_sitk_chatgpy(reference_image: np.ndarray | torch.Tensor | Path | sitk.Image,
+           test_image: np.ndarray | torch.Tensor | Path | sitk.Image,
+           transform : sitk.Transform
+
+           )-> tuple:
+    '''
+    Normalized Cross Correlation (NCC) between two images using SimpleITK.
+    
+    Parameters
+    ----------
+    fixed_image : np.ndarray | torch.Tensor
+        The fixed image.
+    warped_image : np.ndarray | torch.Tensor
+        The warped image.
+    
+    Returns
+    -------
+    float
+        The normalized cross correlation value.
+    '''
+
+        
+    ncc_filter = sitk.FFTNormalizedCorrelationImageFilter()
+    with block_time() as ncc_time:
+        ncc_map = ncc_filter.Execute(reference_image, test_image)
+
+        stats = sitk.StatisticsImageFilter()
+        stats.Execute(ncc_map)
+    time_taken = ncc_time[0]
+    return stats.GetMaximum(), ncc_filter,  time_taken  # Return the maximum NCC value
+
+
+
+
+
+
 #                                    =================================
 #                                           ELASTIX REGISTRATION
 #                                    =================================
+
+#-------------------------------------------WRAPPER-------------------------------------------
+
 def elastix_wrapper_for_registration(sample_dict: SampleDict,
                                      config_dict: dict | FrameworkConfig,
                                      elastix_registration_fn: Callable[[SampleDict, dict], dict],
@@ -158,6 +461,8 @@ def elastix_wrapper_for_registration(sample_dict: SampleDict,
 #                                    =================================
 #                                            AIRLAB REGISTRATION
 #                                    =================================
+
+#-------------------------------------------WRAPPER-------------------------------------------
 
 def airlab_wrapprer_for_registration(sample_dict:SampleDict,
                                      config_dict:dict | FrameworkConfig,
@@ -233,6 +538,9 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
 #                                    =================================
 #                                            DRMINE REGISTRATION
 #                                    =================================
+
+#-------------------------------------------WRAPPER-------------------------------------------
+
 def wrapper_drmine_registration_loop(
         
         parameter_for_registration:dict,
@@ -362,7 +670,9 @@ def wrapper_drmine_registration_loop(
     return registration_dict
 
 
-#======================================== GENERAL PIPELINE ==============================
+#                                           ==========================
+#                                                GENERAL PIPELINE
+#                                           ==========================
 
 
 PreprocessingFn = Callable[[SampleDict | Sequence, dict], SampleDict]
