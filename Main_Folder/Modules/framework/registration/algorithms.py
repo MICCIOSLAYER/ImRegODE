@@ -1,20 +1,24 @@
 # all registration algorithms, it contains the complete wraps of registration, 
 # final products registration that give out result to be collected
-from typing import Sequence, Callable, Optional, Union, Any
+from typing import Sequence, Callable, Optional, Union, Any, Tuple
 from Main_Folder.Modules.framework.registration.methods import initialize_networks, initialize_optimizer
 import Main_Folder.Modules.framework.registration.networks 
-from Main_Folder.Modules.utils import block_time
+from Main_Folder.Modules.utils import block_time, concatenate_paths
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
 from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss, drmine_registration_loop
-from Main_Folder.Modules.framework.data_classes import SampleDict, FrameworkConfig
+from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
+from Main_Folder.Modules.framework.preprocessing import general_preprocessing
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
 from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk
 from Main_Folder.Modules.framework.evaluations import naed_evaluation
 import SimpleITK as sitk
 from pathlib import Path
 from tqdm.auto import tqdm
+from itertools import islice
 from torch import nn
+from torch.utils.data import Dataset, DataLoader
 import torch
 import numpy as np
 
@@ -236,3 +240,79 @@ def wrapper_drmine_registration_loop(
         registration_dict['min_delta']= min_delta
     
     return registration_dict
+
+
+#======================================== GENERAL PIPELINE ==============================
+
+
+PreprocessingFn = Callable[[SampleDict | Sequence, dict], SampleDict]
+RegistrationFn = Callable[[SampleDict, dict], dict]
+
+
+def run_registration_pipeline(dataset : Dataset,                              
+                              registration_fn: RegistrationFn,
+                              config_dict : dict | FrameworkConfig,
+                              preprocessing_fn: Optional[PreprocessingFn] = general_preprocessing,
+                              saving_path: Path = None,
+                              
+                              )-> Tuple[Registration_Data_Collector, Optional[Path]]:
+    '''
+    It RUN a registration Pipeline to actually get the registration results to be put in the DataCollector created
+    the PIPELINE: get the dataset as first input:
+    DATASET ----> PREPROCESSING ---> REGISTRATION to get results
+
+    Args:
+        dataset (Dataset): the Dataset of images it get a easy access to images as path like or PIL images
+        registration_fn (RegistrationFn): main focus of the work, analyze, process, calculate informations about the image pair returning a defined formatted results
+            to be collected in the designated object
+        config_dict: the dict infos containing all tipe of informations, depending also on registration and preprocessing functions, 
+            otherwise only change the yaml file for configuration
+            for a dict type on this level it has to have the folowing keys : 'SAVING_FORMAT' , 'RESULTS', 'batch_size', 'max_sample'
+        preprocessing_fn (PreprocessingFn): adjust the images as requested for the Pipeline and the experiment
+
+        save_results (bool): whether to save the registration results
+        project_root (Path): the root path of the project to save results in the right folder, if used from script use Path(__file__) as start_path
+
+    Returns:
+        Registration_Data_collector: The collector of results
+    '''
+    # 0. PRESET ALL THE PARAMETERS OR CONSTANT FROM YAML OR MANUAL
+    
+    if isinstance(config_dict, dict):
+        registration_dict = config_dict
+        saving_format = config_dict['SAVING_FORMAT']
+        results_path = config_dict['RESULTS']
+        
+    else:
+        registration_dict = config_dict.num_dict
+        saving_format = config_dict.text_dict['SAVING_FORMAT']
+        results_path = config_dict.path_dict['RESULTS']
+
+    data_collector = Registration_Data_Collector()
+    
+    batch_size = registration_dict['batch_size'] 
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    dataset_iterator = iter(dataloader)
+    max_sample = registration_dict['max_sample'] 
+    
+    #1. DEFINE THE PIPELINE
+    for sample in tqdm(islice(dataset_iterator, max_sample), total=max_sample, desc="Running Registration Pipeline"):
+        
+        preprocessed_sample = preprocessing_fn(sample, config_dict)
+        registration_results = registration_fn(preprocessed_sample)
+
+        data_collector.add_registration_data(registration_results)
+    
+    #2. SAVE RESULTS
+    if saving_path and saving_path.exists():
+        save_results_in = saving_path
+    else:
+        save_results_in = results_path
+        result_type = saving_format
+        
+        path_to_results = data_collector.save_data(filename='wrapper_trial', fmt=result_type, results_path=save_results_in) # FIXME use config_dict
+
+    
+    
+
+    return (data_collector, path_to_results)
