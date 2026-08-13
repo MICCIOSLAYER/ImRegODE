@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import SimpleITK as sitk
 import sys
-from typing import Sequence
+from typing import Sequence, Union, Protocol, Any, runtime_checkable
 import matplotlib.pyplot as plt
 from pathlib import Path
 from Main_Folder.Modules.utils import get_tensor
@@ -143,6 +143,13 @@ def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME t
     plt.close()
     return image_confrontation
 
+
+
+@runtime_checkable
+class ElastixParameterMap(Protocol):
+    def GetParameterMap(self, *args:Any,
+                        **kwargs:Any,)->dict:
+        ...
 
 def get_affine_matrix_from_sitk_transform(sitk_transform: Union[sitk.AffineTransform,  ElastixParameterMap],
                                           )-> torch.Tensor:
