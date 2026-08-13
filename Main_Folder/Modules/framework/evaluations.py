@@ -4,6 +4,8 @@ from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.configuration_setting.yaml_configuration import  FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from typing import Optional, Union, Literal
+from skimage.filters import gaussian
+from skimage.color import rgb2gray
 import numpy as np
 import torch
 from pathlib import Path
@@ -115,4 +117,77 @@ def naed_evaluation(image_couple_name: str,
     naed_value = total_distance / ratio
     
     return naed_value
+
+
+
+def mattes_mutual_information(image1, image2, bins=32):
+    """
+    Calculate Mattes Mutual Information (MMI) between two images.
+
+    Parameters:
+    -----------
+    image1 : np.ndarray
+        The first image (grayscale or RGB).
+    image2 : np.ndarray
+        The second image (grayscale or RGB).
+    bins : int
+        Number of bins for the histogram.
+
+    Returns:
+    --------
+    float
+        The Mattes Mutual Information value.
+    """
+    # Convert images to grayscale if they are RGB
+    if image1.ndim == 3:
+        image1 = rgb2gray(image1)
+    if image2.ndim == 3:
+        image2 = rgb2gray(image2)
+
+    # Apply Gaussian smoothing
+    image1 = gaussian(image1, sigma=1)
+    image2 = gaussian(image2, sigma=1)
+
+    # Compute joint histogram
+    hist_2d, _, _ = np.histogram2d(image1.ravel(), image2.ravel(), bins=bins)
+
+    # Normalize the histogram
+    pxy = hist_2d / float(np.sum(hist_2d))
+
+    # Compute marginal probabilities
+    px = np.sum(pxy, axis=1)
+    py = np.sum(pxy, axis=0)
+
+    # Compute mutual information
+    px_py = px[:, None] * py[None, :]
+    nzs = pxy > 0
+    mmi = np.sum(pxy[nzs] * np.log(pxy[nzs] / px_py[nzs]))
+
+    return mmi
+
+def joint_histogram_mutual_information(image1, image2):
+    # Compute the joint histogram
+    hist, x_edges, y_edges = np.histogram2d(image1.ravel(), image2.ravel(), bins=100)
+    pxy = hist / float(np.sum(hist))
+    
+    # Compute marginal probabilities
+    px = np.sum(pxy, axis=1)
+    py = np.sum(pxy, axis=0)
+    px_py = px[:, None] * py[None, :]
+    nzs = pxy > 0
+
+    # Compute the joint entropy
+    joint_entropy = -np.sum(pxy[nzs] * np.log(pxy[nzs]))
+    
+    # NOTE suggerito da copilot
+    # Compute the marginal entropies 
+    hx = -np.sum(px[px > 0] * np.log(px[px > 0]))
+    hy = -np.sum(py[py > 0] * np.log(py[py > 0]))
+    
+    # Compute mutual information
+    mi = hx + hy - joint_entropy
+    #return mi
+
+    # NOTE dal notebook:
+    return np.sum(pxy[nzs] * np.log(pxy[nzs] / px_py[nzs])) # this is the original one
     
