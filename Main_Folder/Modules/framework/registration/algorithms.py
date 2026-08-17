@@ -461,6 +461,60 @@ def elastix_wrapper_for_registration(sample_dict: SampleDict,
 
 #-------------------------------------------REGISTRATION FNS-------------------------------------------
 
+def elastix_registration(reference_image: itk.Image,
+                        test_image: itk.Image,
+                        config_dict: dict | FrameworkConfig,
+                       
+                        )-> tuple:
+    '''
+    _summary_
+
+    Args
+    -----
+        reference_image (itk.Image): itk image of reference
+        test_image (itk.Image): itk image of test as deformed
+        config_dict (dict | FrameworkConfig): configuration object:
+            DICT -> mandatory keys: 'sampling_ratio', 'histo_bins', 'n_resolution', 'n_iterations'
+
+    Returns
+    -------
+    tuple
+        The registered image and the registration parameters.
+    '''
+    if isinstance(config_dict, dict):
+        elastix_config_dict = config_dict
+        # NOTE there are to be asserts to verify some keys
+    else:
+        elastix_config_dict = config_dict.registrations['elastix_original']
+    
+    sampling_ratio = elastix_config_dict['sampling_ratio'] # not specified in the article, but used to be coherent with other methods
+    histogram_bins= elastix_config_dict['histo_bins']
+    num_resolutions= elastix_config_dict['n_resolution']
+    max_iterations= elastix_config_dict['n_iterations']
+    with block_time() as registration_time:
+        transformation_parameters = itk.ParameterObject.New() # set the pparameter object
+        affine_params_map = transformation_parameters.GetDefaultParameterMap('affine') # set the parameter for affine transformation
+        affine_params_map['metric'] = ['NormalizedMutualInformation']
+        affine_params_map['MetricSamplingPercentage'] = [f'{sampling_ratio}']
+        affine_params_map['WritingResultImage'] = ['false'] # to avoid saving the registered image in the current folder
+        affine_params_map['DefauldtPixelValue'] = ['0'] # to avoid having black borders in the registered image
+        affine_params_map['NumberOfHistogramBins'] = [f'{histogram_bins}']
+        affine_params_map['NumberOfResolutions'] = [f'{num_resolutions}']
+        affine_params_map['MaximumNumberOfIterations'] = [f'{max_iterations}']
+        transformation_parameters.SetParameterMap(affine_params_map)
+    
+        registred_image, registration_parameters=  itk.elastix_registration_method(
+            fixed_image=reference_image,
+            moving_image=test_image,
+            parameter_object=transformation_parameters,
+            log_to_console=True)
+    time_taken = registration_time[0]
+
+
+    return registration_parameters, time_taken, registred_image
+
+
+
 
 #                                    =================================
 #                                            AIRLAB REGISTRATION
