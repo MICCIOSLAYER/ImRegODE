@@ -13,6 +13,7 @@ from PIL import Image as PImage
 from typing import Union, Optional, Sequence, Any
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
+from Main_Folder.Modules.framework.preprocessing import rescaling_image
 from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
@@ -147,7 +148,55 @@ def show_image_and_reference_points(image: torch.Tensor,
         if save_path.exists():
             save_path= Path(f'{save_path.split('.'[0])}_{get_data_time()}.png')
         plt.savefig(save_path)
-        
+
+
+def elastix_show_difference_image(reference_image: itk.Image,
+                                test_image: itk.Image,
+                                registered_image: itk.Image,
+                                saving_path: Path = None,                                
+                               )-> Optional[Path]:
+    '''
+        Show the difference images between reference and test, and reference and registered images.
+
+    Args:
+        reference_image (itk.Image): image of reference
+        test_image (itk.Image): image of testing
+        registered_image (itk.Image): image warped through registration
+        saving_path (Path, optional): saving path. Defaults to None.
+
+    Returns:
+        Path :  saving path. Defaults to None.
+    '''
+    reference_normalized = rescaling_image(reference_image)
+    test_normalized = rescaling_image(test_image)
+    registered_normalized = rescaling_image(registered_image)
+    original_difference = np.array(itk.array_view_from_image(reference_normalized) - np.array(itk.array_view_from_image(test_normalized)))
+    registered_difference = np.array(itk.array_view_from_image(reference_normalized) - np.array(itk.array_view_from_image(registered_normalized)))
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    plt.figsize=[100,100]
+    axes[0].imshow(original_difference, cmap='gray')
+    axes[0].set_title('Prior Registration', fontsize=10, loc='left')
+    axes[0].axis('off')
+    axes[0].set_title(f'RMSE: {np.sqrt((original_difference**2).mean()):.4f}', fontsize=10, loc='right')
+    axes[1].imshow(registered_difference, cmap='gray')
+    axes[1].set_title('After Registration', fontsize=10, loc='left')
+    axes[1].axis('off')
+    axes[1].set_title(f'RMSE: {np.sqrt((registered_difference**2).mean()):.4f}', fontsize=10, loc='right')
+    fig.get_label()
+    if saving_path.exists():
+        imagedir_save_path = saving_path
+    elif not saving_path.exists() and not saving_path is None:
+        imagedir_save_path = FrameworkConfig().path_dict['IMG_RESULTS']
+        standard_log.warning(f'since the chosen {saving_path} do not corresponds to any of existent path the default one in yaml configuration is used')
+    else:
+        return None
+    saving_name = Path(imagedir_save_path) / 'Difference_Elastix.png'
+    if saving_name.exists():
+        saving_name = Path(imagedir_save_path) / f'Difference_Elastix{get_data_time()}.png'
+    plt.savefig(saving_name)
+    plt.show()
+
+    return imagedir_save_path
 
 
 def airlab_show_image_differencies(reference_image: AirlabImage,
