@@ -400,6 +400,19 @@ def normalize_img (image : image_type | torch.Tensor,
     else: 
         return cv2.normalize(_image_to_numpy(image), None, alpha=NORM_MIN, beta=NORM_MAX, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
+
+def rescaling_image(img:itk.Image):
+    '''
+    Rescale the image to the range [0, 1] 
+    '''
+    rescaler = itk.RescaleIntensityImageFilter.New(img)
+    rescaler.SetOutputMinimum(0.0)
+    rescaler.SetOutputMaximum(1.0)
+    rescaler.Update()
+    rescaled_img = rescaler.GetOutput()
+    return rescaled_img
+
+
 #=============
 # PYRAMID
 #=============
