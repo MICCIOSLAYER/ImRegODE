@@ -5,7 +5,7 @@ from Main_Folder.Modules.framework.registration.methods import initialize_networ
 import Main_Folder.Modules.framework.registration.networks 
 from Main_Folder.Modules.utils import block_time, concatenate_paths
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
-from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss, drmine_registration_loop
+from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
@@ -458,6 +458,10 @@ def elastix_wrapper_for_registration(sample_dict: SampleDict,
 
 
 
+
+#-------------------------------------------REGISTRATION FNS-------------------------------------------
+
+
 #                                    =================================
 #                                            AIRLAB REGISTRATION
 #                                    =================================
@@ -532,6 +536,10 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
 
     
     return registration_data
+
+
+
+#-------------------------------------------REGISTRATION FNS-------------------------------------------
 
 
 
@@ -668,6 +676,13 @@ def wrapper_drmine_registration_loop(
         registration_dict['min_delta']= min_delta
     
     return registration_dict
+
+
+
+#-------------------------------------------REGISTRATION FNS-------------------------------------------
+
+
+
 
 
 #                                           ==========================
