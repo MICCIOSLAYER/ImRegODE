@@ -594,6 +594,175 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
 
 
 #-------------------------------------------REGISTRATION FNS-------------------------------------------
+def airlab_mi_registration  (reference_image: AirlabImage,
+                            test_image: AirlabImage,
+                            config_dict:dict | FrameworkConfig,
+                            reference_mask: Optional[AirlabImage] = None,
+                            test_mask: Optional[AirlabImage] = None,                            
+                            show_plots : bool = False,
+                            save_image : bool = False,
+                            device: Optional[torch.device] = None,
+                            
+                            EarlyStopping : bool = False
+                            ) -> dict: # (displacement_field, registration_state_dict)
+    '''
+    Perform image registration using AirLab with Mutual Information as the loss function.
+
+    Parameters
+    ----------
+
+    reference_image: AirlabIamge
+        The reference image. In a ready format from airlab.Image
+    moved_image : AilrabImage
+        The tested image. In a ready format from airlab.Image
+    config_dict: dict
+        The dict from which the parameters has to be taken
+    reference_mask: AirlabImage, optional
+        The mask of the reference image, to define which point to consider during the loss calcula
+    test_mask: AirlabImage, optional
+        The mask of the tested image, to define which point to consider during the loss calcula
+    show_plots : bool
+        Whether to display plots during registration.
+    save_image : bool
+        Whether to save plots during registration.
+    
+    device : torch.device, optional
+        The device to run the registration on. If None, it will use 'cuda' if available, otherwise 'cpu'.
+    EarlyStopping: bool
+        A flag to define how to stop the registration loop
+
+    Returns
+    -------
+
+        tuple: Homography matrix and a dictionary containing the registration state and parameters.
+            H, dict.keys() =['registration_type', 'time_taken', 'registrations_data', 'normalization_type',
+                               'metric_num_bins', 'metric_sigma', 'learning_rate', 'num_iterations',
+                               'loss_history']
+    '''
+    #============DEVICE SELECTION============
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logs=logging.getLogger(__name__)
+    
+
+    airlab_config_dict = config_dict['registrations']['airlab']
+    metric_num_bins = airlab_config_dict['histo_bins']
+    metric_sigma = airlab_config_dict['metric_sigma']
+    spatial_sampling = airlab_config_dict['sampling_ratio']
+    learning_rate = airlab_config_dict['lr']
+    num_iterations = airlab_config_dict['n_iterations']
+
+    images_dim = int(reference_image.ndim)
+
+
+    #=============REGISTRATION SETUP==============
+    if not airlab_config_dict['masked']:
+        airlab_metric = MI(
+            fixed_image=reference_image, 
+            moving_image=test_image, 
+            bins=metric_num_bins, 
+            sigma=metric_sigma,
+            spatial_samples=spatial_sampling,
+        )
+    else:
+            
+            airlab_metric = MI(
+            fixed_image=reference_image, 
+            fixed_mask=reference_mask,
+            moving_image=test_image, 
+            moving_mask=test_mask,
+            #background= fixed_image_airlab.numpy()[0, 0], # prova per prendere i valori di background direttamente dall'immagine, per MI da airlab, se background non è spiecificato viene assunto dal min dell'immagine
+            bins=metric_num_bins, 
+            sigma=metric_sigma,
+            spatial_samples=spatial_sampling,
+        )
+
+    airlab_transformation = AffineTransformation(moving_image=test_image, opt_cm=False)
+    airlab_transformation.init_translation(fixed_image=reference_image)
+
+    airlab_optimizer = torch.optim.Adam(
+        airlab_transformation.parameters(), 
+        lr=learning_rate, 
+        amsgrad=True
+        )
+    
+    with block_time() as registration_time:
+        airlab_registration = PairwiseRegistration()
+        airlab_registration.set_optimizer(airlab_optimizer)
+        airlab_registration.set_number_of_iterations(num_iterations)
+        airlab_registration.set_transformation(airlab_transformation)
+        airlab_registration.set_image_loss([airlab_metric])
+        if not EarlyStopping:
+            airlab_registration.start(EarlyStopping=False, )
+        else:
+            patience = airlab_config_dict['early-stopping']['patience']               # quante iterazioni senza miglioramento prima di fermarsi
+            min_delta = airlab_config_dict['early-stopping']['min_delta']            # minimo miglioramento considerato valido (per MI spesso 1e-7)
+            best_loss = float('inf')
+            patience_counter = 0
+            best_state = None            # salveremo qui lo stato migliore
+
+            loss_history = []            # per tracciare tutto
+
+            logs.warning("Staring registration with EarlyStopping-mode")
+
+            for iteration in range(num_iterations):
+                
+                # Esegui un passo di ottimizzazione (calcola loss + backward + update)
+                loss_value = airlab_optimizer.step(airlab_registration._closure)
+                
+                # Converti in float scalare per confronti sicuri
+                current_loss = float(loss_value.item()) if torch.is_tensor(loss_value) else loss_value
+                
+                loss_history.append(current_loss)
+                
+                # Controllo miglioramento
+                if current_loss < best_loss - min_delta:
+                    best_loss = current_loss
+                    patience_counter = 0
+                    # Salva lo stato attuale dei parametri (è sicuro, non fa deepcopy profondo)
+                    best_state = airlab_transformation.state_dict().copy()  # .copy() shallow è ok per dict di tensor leaf
+                    logs.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (best)")
+                else:
+                    patience_counter += 1
+                    logs.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (worse)")
+                    
+                    if patience_counter >= patience:
+                        logs.warning(f"Early stopping activated after {iteration+1} iteration (patience={patience})")
+                        # Ripristina lo stato migliore
+                        if best_state is not None:
+                            airlab_transformation.load_state_dict(best_state)
+                        break
+
+                                  
+
+    airlab_time_taken = registration_time[0]
+ 
+    #========== RESULTS================ show_save_image
+    if show_plots:
+        airlab_show_image_differencies(
+            test_image=test_image,
+            reference_image=reference_image,
+            airlab_transformation=airlab_transformation,
+            save_images = save_image,
+            airlab_dict=airlab_config_dict,
+        )
+        
+        
+    #8. return the displacement field and registration state dictionary
+    transformation_matrix = airlab_transformation._compute_transformation_matrix() # da sostituire con airlab_transformation.get_transformation_matrix() 
+    H=torch.eye(images_dim+1, dtype=torch.float32, device=device)
+    H[:images_dim, :]=transformation_matrix
+    airlab_state_dict = airlab_registration._transformation.state_dict()
+    airlab_state_dict.pop('_grid', None)
+                               
+    registration_state_dict = {'time_taken' : airlab_time_taken,
+                               'airlab_transformation': airlab_transformation,
+                               'registrations_data' : airlab_state_dict,
+                               'H_matrix': H.detach().cpu().numpy(),
+                               'loss_history': airlab_registration.lossHistory,
+                               'device': device,}
+                               
+    return registration_state_dict
 
 
 
