@@ -4,13 +4,14 @@ import os
 from pathlib import Path
 #import numpy as np
 #import yaml
-from typing import  Literal, Optional, Any
+from typing import  Literal, Optional, Any, Union
 import numpy as np
 import SimpleITK as sitk
 from collections.abc import Mapping
 import torch
 from torch import nn
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from timeit import default_timer as timer
 from contextlib import contextmanager
 from functools import wraps
@@ -205,6 +206,51 @@ def get_dirs_of(file_path : Path,
         
     image_type, image_deformation, file_name =  file_path.parts[-3:]
     return [image_type, image_deformation, file_name]
+
+Saving_Type = Union[Path, str]
+ExtensionType = Literal['png', 'pkl', 'txt', 'csv'] # FIXME to be completed
+
+def get_saving_name(format : ExtensionType,
+                    save_path: Saving_Type = FrameworkConfig().path_dict['RESULTS'],
+                    saving_name : str = '',
+                    overwrite : bool = False,
+                    )->Path:
+    '''
+    easy way to set the name of file to save
+
+    Args:
+        save_path (Saving_Type): saving path of the file
+        saving_name (str, optional): the saving name of the object. Defaults to ''.
+        overwrite (bool, optional): flag to define if a change in saving_name is necessary. Defaults to False.
+
+    Returns:
+        Path: the path of the saving file or dir 
+    '''
+    date_time_name = get_data_time()
+    save_path = Path(save_path)
+    extension = f'.{format.lower()}'
+   
+
+    if save_path.is_dir() and saving_name:
+        return_path= Path(save_path) 
+        saving_name = Path(saving_name).name
+    elif save_path.is_dir() and not saving_name:
+        return Path(save_path) / Path(f'{date_time_name}').with_suffix(f'{extension}')
+    elif not save_path.is_dir():
+        if save_path.parent.exists() and save_path.parent != Path('.'):
+            return_path = save_path.parent
+            saving_name = save_path.name            
+        elif save_path.parent == Path('.'): # NOTE usare else: ? 
+            return_path = FrameworkConfig().path_dict['RESULTS'] 
+            saving_name = save_path.name
+    
+    saving_file_path = Path(return_path) / Path(saving_name).with_suffix(f"{extension}")
+    if not overwrite and  saving_file_path.exists():
+        saving_name = f'{date_time_name}_{saving_name}'
+
+    return Path(return_path)/Path(saving_name).with_suffix(f"{extension}")
+             
+
 
 # ======================================================================================
 #                                     OBJS UTILITIES(maintaining their nature)
