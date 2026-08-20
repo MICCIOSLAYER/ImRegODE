@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from datetime import datetime
 import pickle
+import sys
 from torch.utils.data import Dataset, DataLoader
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
@@ -338,3 +339,59 @@ class Registration_Data_Collector:
         else:
             raise ValueError(f"Unsupported format: {fmt}. Supported formats are 'csv', 'json', 'excel' or 'pickle'.")
         return path
+
+
+
+
+def data_size_of_this(
+        obj : Union[Path, Registration_Data_Collector],
+        restricted_info : int = 5,
+        mean_info : bool = False,
+        )->None:
+    '''
+    the function get the object and return the dimension of the ensamble and parts of it
+
+    Args:
+        obj (Union[Path, Registration_Data_Collector]): the path where the object is saved or the Data collector itself
+        restricted_info (int): it get a little samples of informations stored in the collector
+        mean_info: it get the mean of information stored across the collector YET TO BE IMPLEMENTED
+
+    
+    Return:
+        None
+    '''
+    if isinstance(obj, Path):
+        if not obj.exists():
+            raise FileNotFoundError('error during loading, the file doesn\'t exists')
+        else:
+            with open(obj, "rb") as f:
+                try:
+                    collector = pickle.load(f)
+                except RuntimeError:
+                    print('some error occured, try to get using torch.load')
+                    try:
+                        collector=torch.load(f,
+                                pickle_module = pickle,
+                                weights_only = False,
+                                map_location=torch.device('cpu'))
+                    except RuntimeError:
+                        print('impossible to load the file control the type of file to be loaded, it has to be compatible with Registration_Data_Collector')
+    
+    else:
+        collector = obj
+    
+    print('Num of  Sample: ', len(collector.collection))
+    max_data_to_see = min(restricted_info, len(collector.collection))
+    for image_pair in list(collector.collection.keys())[:max_data_to_see]:
+        data = collector.collection[image_pair]
+        print(f"Features of {image_pair}: {list(data.keys())}")
+            
+        for k, v in data.items():
+            try:
+                size_kb = sys.getsizeof(v) / 1024 
+                if size_kb :
+                    print(f"{k:24} → ~{size_kb:.2f} KB   (tipo: {type(v).__name__})")
+            except:
+                print(f"{k:24} → [errore nel sizeof]")
+
+    return None

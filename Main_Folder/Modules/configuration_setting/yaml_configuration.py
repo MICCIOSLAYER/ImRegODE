@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 
 
-from Main_Folder.Modules.utils import deep_update, get_root_path, concatenate_paths
+from Main_Folder.Modules.utils import get_root_path, concatenate_paths, deep_update
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 
 root_path = get_root_path()
@@ -169,5 +169,6 @@ class FrameworkConfig:
     @property
     def registrations(self):
         return self._config_dict['registrations']
+
 
     

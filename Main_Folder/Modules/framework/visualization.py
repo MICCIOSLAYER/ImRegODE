@@ -6,6 +6,7 @@ import sys
 import itk
 from airlab.utils import Image as AirlabImage
 from airlab.transformation.utils import warp_image
+
 import numpy as np
 from pathlib import Path
 from datetime import datetime
@@ -14,45 +15,12 @@ from typing import Union, Optional, Sequence, Any
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.preprocessing import rescaling_image
-from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths
+from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths, image_to_numpy
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
 
 standard_log = get_logger(__name__)
-def _image_to_numpy(image : Image_Type
-                    )-> np.ndarray:
-    '''
-    Asimple function to convert any image type in np.ndarray to plot using matplotlib
 
-    Args:
-        image (Image_Type): the image to be convert in a np.ndarray
-
-    Returns:
-        np.ndarray: the image as np.ndarray 
-    '''
-    if isinstance(image, torch.Tensor):
-        if image.squeeze().ndim == 3:
-            return permute_channel_layout(image=image.squeeze(), target_format = '**C').detach().cpu().numpy()
-        return image.squeeze().detach().cpu().numpy()
-        
-    elif isinstance(image, itk.Image):
-        return itk.array_from_image(image)
-
-    elif isinstance(image, sitk.Image):
-        return sitk.GetArrayFromImage(image=image)
-
-        
-    elif isinstance(image, AirlabImage):
-        return image.image.detach().cpu().numpy()
-        
-    elif isinstance(image, Path):
-        return np.asarray(PImage.open(image))
-    elif isinstance(image, np.ndarray):
-        standard_log.info('the image type is already a np.ndarray, so it\'returned as it is')
-        return image
-    else:
-        standard_log.error(f'unable to convert since: f{type(image)} is yet to be handled')
-        raise TypeError (f'Unsupported Type: {type(image)}')
 
     
 def show_images(image_list: Sequence[Image_Type] | Image_Type,
@@ -90,7 +58,7 @@ def show_images(image_list: Sequence[Image_Type] | Image_Type,
         raise ValueError('the number of titles must match the number of images')
 
     if n_images == 1:
-        img = _image_to_numpy(images[0])
+        img = image_to_numpy(images[0])
         plt.figure(figsize=fig_size)
         if img.ndim == 2:
             plt.imshow(img, cmap=cmap)
@@ -107,7 +75,7 @@ def show_images(image_list: Sequence[Image_Type] | Image_Type,
     fig, axes = plt.subplots(n_row, n_cols, figsize= fig_size)
     axes = np.atleast_1d(axes).ravel()
     for ax, image, title in zip(axes, images, titles):
-        img = _image_to_numpy(image)
+        img = image_to_numpy(image)
         if img.ndim == 2:
             ax.imshow(img, cmap=cmap)
         else:

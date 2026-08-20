@@ -3,7 +3,7 @@
 from typing import Callable, TypedDict, Optional, Tuple, Sequence, Required, NotRequired, Union, Literal, Any
 from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
-from Main_Folder.Modules.framework.visualization import _image_to_numpy
+from Main_Folder.Modules.utils import image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import get_tensor
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
