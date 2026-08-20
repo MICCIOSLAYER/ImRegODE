@@ -235,20 +235,24 @@ def get_saving_name(format : ExtensionType,
         return_path= Path(save_path) 
         saving_name = Path(saving_name).name
     elif save_path.is_dir() and not saving_name:
+        standard_log.info(f'since no name is used it will be assigned the datetime in fomrat: {date_time_name}')
         return Path(save_path) / Path(f'{date_time_name}').with_suffix(f'{extension}')
     elif not save_path.is_dir():
-        if save_path.parent.exists() and save_path.parent != Path('.'):
+        if save_path.parent.is_dir() and save_path.parent != Path('.'):
             return_path = save_path.parent
             saving_name = save_path.name            
-        elif save_path.parent == Path('.'): # NOTE usare else: ? 
+        else: 
             return_path = FrameworkConfig().path_dict['RESULTS'] 
+            standard_log.warning(f'the parent dir {save_path.parent} is not avaiable, so the default one {return_path} is selected')
             saving_name = save_path.name
     
     saving_file_path = Path(return_path) / Path(saving_name).with_suffix(f"{extension}")
     if not overwrite and  saving_file_path.exists():
-        saving_name = f'{date_time_name}_{saving_name}'
+        standard_log.info(f'since the {saving_file_path} is an existitng one, due to avoid overwriting a new one is selected')
+        saving_file_path = Path(return_path) / Path(f'{date_time_name}_{saving_file_path.stem}').with_suffix(extension)
+        
 
-    return Path(return_path)/Path(saving_name).with_suffix(f"{extension}")
+    return saving_file_path
              
 
 
