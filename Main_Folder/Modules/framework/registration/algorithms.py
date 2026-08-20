@@ -10,6 +10,7 @@ from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
 from Main_Folder.Modules.framework.preprocessing import general_preprocessing, airlab_mask_configuration
+from Main_Folder.Modules.framework.visualization import airlab_show_image_differencies
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
 from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk, airlab_read_image
 from Main_Folder.Modules.framework.evaluations import naed_evaluation
@@ -525,6 +526,8 @@ def elastix_registration(reference_image: itk.Image,
 def airlab_wrapprer_for_registration(sample_dict:SampleDict,
                                      config_dict:dict | FrameworkConfig,
                                      airlab_registration_fn: Callable[[AirlabImage, AirlabImage, dict], dict],
+                                     show_difference : bool = False,
+                                     saving_path : Path = None
                                      )-> dict:
     '''
     Wrapper forfor airlab registration loop -type it uniform registration loops to take the same inputs and give out the results 
@@ -563,28 +566,38 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
                                                                 test_image_airlab=airlab_test_image,
                                                                 config_dict=config_dict)
         
-        affine_matrix, registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
-                                                                                reference_mask = airlab_reference_mask,
-                                                                                test_mask=airlab_test_mask,
-                                                                                moved_image=airlab_test_image,
-                                                                                config_dict=config_dict,
-                                                                              )
+        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                   reference_mask = airlab_reference_mask,
+                                                   test_mask=airlab_test_mask,
+                                                   moved_image=airlab_test_image,
+                                                   config_dict=config_dict,
+                                                   )
     else:
-        affine_matrix, registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
-                                                                                moved_image=airlab_test_image,
-                                                                                config_dict=config_dict,
-                                                                                )
+        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                   moved_image=airlab_test_image,
+                                                   config_dict=config_dict,
+                                                   )
+    if show_difference:
+        airlab_show_image_differencies(
+            test_image=airlab_test_image,
+            reference_image=airlab_reference_image,
+            airlab_transformation=registration_data['airlab_transformation'],
+            save_images = saving_path,
+            airlab_dict=airlab_config_dict,
+        )
+
+
     image_name_couple = sample_dict['sample_name']
     naed_diagonal = naed_evaluation(image_couple_name=image_name_couple,
-                                affine_matrix=affine_matrix,
+                                affine_matrix=registration_data['H_matrix'],
                                 image_normalization='diagonal')
     naed_norm_coord = naed_evaluation(image_couple_name=image_name_couple,
-                                affine_matrix=affine_matrix,
+                                affine_matrix=registration_data['H_matrix'],
                                 image_normalization='coords_norm')
     
     registration_data['naed_diagonal'] = naed_diagonal
     registration_data['naed_coords'] = naed_norm_coord
-    registration_data['affine_matrix'] = affine_matrix.detach().cpu().numpy()
+    registration_data['affine_matrix'] = registration_data['H_matrix'].detach().cpu().numpy()
 
 
 
@@ -598,11 +611,8 @@ def airlab_mi_registration  (reference_image: AirlabImage,
                             test_image: AirlabImage,
                             config_dict:dict | FrameworkConfig,
                             reference_mask: Optional[AirlabImage] = None,
-                            test_mask: Optional[AirlabImage] = None,                            
-                            show_plots : bool = False,
-                            save_image : bool = False,
+                            test_mask: Optional[AirlabImage] = None,
                             device: Optional[torch.device] = None,
-                            
                             EarlyStopping : bool = False
                             ) -> dict: # (displacement_field, registration_state_dict)
     '''
@@ -642,7 +652,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     #============DEVICE SELECTION============
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logs=logging.getLogger(__name__)
+    
     
 
     airlab_config_dict = config_dict['registrations']['airlab']
@@ -703,7 +713,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
 
             loss_history = []            # per tracciare tutto
 
-            logs.warning("Staring registration with EarlyStopping-mode")
+            standard_log.warning("Staring registration with EarlyStopping-mode")
 
             for iteration in range(num_iterations):
                 
@@ -721,13 +731,13 @@ def airlab_mi_registration  (reference_image: AirlabImage,
                     patience_counter = 0
                     # Salva lo stato attuale dei parametri (è sicuro, non fa deepcopy profondo)
                     best_state = airlab_transformation.state_dict().copy()  # .copy() shallow è ok per dict di tensor leaf
-                    logs.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (best)")
+                    standard_log.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (best)")
                 else:
                     patience_counter += 1
-                    logs.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (worse)")
+                    standard_log.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (worse)")
                     
                     if patience_counter >= patience:
-                        logs.warning(f"Early stopping activated after {iteration+1} iteration (patience={patience})")
+                        standard_log.warning(f"Early stopping activated after {iteration+1} iteration (patience={patience})")
                         # Ripristina lo stato migliore
                         if best_state is not None:
                             airlab_transformation.load_state_dict(best_state)
@@ -737,15 +747,8 @@ def airlab_mi_registration  (reference_image: AirlabImage,
 
     airlab_time_taken = registration_time[0]
  
-    #========== RESULTS================ show_save_image
-    if show_plots:
-        airlab_show_image_differencies(
-            test_image=test_image,
-            reference_image=reference_image,
-            airlab_transformation=airlab_transformation,
-            save_images = save_image,
-            airlab_dict=airlab_config_dict,
-        )
+    
+    
         
         
     #8. return the displacement field and registration state dictionary
