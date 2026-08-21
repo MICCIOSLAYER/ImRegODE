@@ -5,7 +5,7 @@ from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.utils import image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import get_tensor
+from Main_Folder.Modules.utils import get_tensor, image_to_numpy
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
 import SimpleITK as sitk
@@ -206,8 +206,8 @@ def crop_images(moving_image : Path | torch.Tensor,
     '''
 
     #open the images depending on the type
-    move_image= _image_to_numpy(moving_image)
-    fix_image = _image_to_numpy(fixed_image)
+    move_image= image_to_numpy(moving_image)
+    fix_image = image_to_numpy(fixed_image)
     if isinstance(config_dict, dict):
         LOWEDGE_BOX, HIGHEDGE_BOX = config_dict.get('LOWEDGE_BOX', float(Fraction(1.5/9))), config_dict.get('HIGHEDGE_BOX', float(Fraction(7.5/9)))
     else:
@@ -398,7 +398,7 @@ def normalize_img (image : image_type | torch.Tensor,
         norm_image = (image - img_MIN)*(NORM_MAX - NORM_MIN)/ (img_MAX -img_MIN)
         return norm_image
     else: 
-        return cv2.normalize(_image_to_numpy(image), None, alpha=NORM_MIN, beta=NORM_MAX, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        return cv2.normalize(image_to_numpy(image), None, alpha=NORM_MIN, beta=NORM_MAX, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
 
 def rescaling_image(img:itk.Image):
