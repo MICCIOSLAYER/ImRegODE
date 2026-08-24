@@ -2,11 +2,13 @@
 from typing import Union, Optional
 import SimpleITK as sitk
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import tensor_img_rgb2bn, permute_channel_layout
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
+from Main_Folder.Modules.utils import tensor_img_rgb2bn, permute_channel_layout, get_root_path
 import torch
 from airlab.utils.image import Image as AirlabImage
 
 import os
+import shutil
 import py7zr
 import requests
 import zipfile
@@ -79,6 +81,97 @@ def get_dataset(
 
     standard_log.info(f'{dataset_name} has been successfully downloaded and extracted to {destination_path}')
     return None
+
+
+#------------------------------------------ DATASET ORGANIZATION -------------------------------------------
+
+
+def organize_folder(parent_folder : Path, # the path folder to organize
+                    categories : list[str], # name of the folders
+                    folder_names: list[str] = []): # the categories of daughter folders
+    # aggiungi un file.suffix per il tipo di file da organizzare e spostare nella cartella
+    '''given a certain parent dir it reorganize the files respecting the categories:
+
+    assure to give the respective order between the folder name and the categories if given
+    EXAMPLE: 
+        folder_names = ['truth', 'fake']
+        categories ['_1', '_2']
+        if _1 corresponds to truth folder
+    '''
+    if not len(categories):
+        print('[ERROR] the categories must be given')
+        return 
+    
+    
+    # get the list of files in parent folder
+    files = [f for f in parent_folder.glob('*') if f.is_file()]
+    if not len(files):
+        print(f'[ERROR] there are no files in {parent_folder}')
+    # control if categories are indentifiable
+    absent_cat =[]
+    for cat in categories:
+        cat_not_in = False
+        for file in files:
+            if cat in file.name:
+                cat_not_in = True
+                break
+        if not cat_not_in :
+            absent_cat.append(cat)
+    for cat in set(absent_cat):
+        print(f'[ERROR] the category {cat} is not identifiable in the files')
+            
+        
+    # control if folder names is given:
+    if not len(folder_names):
+        folder_names = categories
+    
+    for daughter_folder in folder_names:
+        # create the folder if it does not exist
+        daughter_folder_path = parent_folder / daughter_folder
+        
+        if not daughter_folder_path.is_dir():
+            os.makedirs(daughter_folder_path, exist_ok=True)
+        
+        #then move the file if the type of category is in
+    path_cat_dict = {k.upper():v for k , v in zip(categories, folder_names)}
+
+    for file in files:
+        for cat in categories:
+            if file.name.__contains__(cat.upper()):
+                new_folder = parent_folder / path_cat_dict[cat.upper()] / file.name #parent_folder / path_cat_dict[cat]
+                shutil.move(src=str(file), dst=str(new_folder))
+                break
+
+
+def organize_fire_dataset_framework_for_project():
+    '''standard function to organize easily the downloaded raw dataset
+    for a easily access to the project framework'''
+    path_of_fire_dataset = get_root_path() / 'Main_Folder' /'Modules'/'dataset' / 'FIRE'
+
+    if not path_of_fire_dataset.exists() or not any(path_of_fire_dataset.iterdir()):
+        raise ValueError(f'the {path_of_fire_dataset} does not contain any FIRE dataset, download it again and put it in {download_path_of_fire_dataset}')
+    
+    ref_test_type = ['Reference','Test']
+    ref_test_categories = ['_1', '_2']
+    fire_images_path = Path(path_of_fire_dataset)/ 'Images' 
+    if not Path(fire_images_path/ 'Reference' ).exists():
+        organize_folder(parent_folder=fire_images_path, categories=ref_test_categories, folder_names=ref_test_type)
+    else:
+        standard_log.info(f'the folder {fire_images_path} has been already organized')
+
+    distrorsion_type = ['Longitudinal_Studies', 'Mosaicing', 'Super_Resolution']
+    distorsion_categories = ['A', 'P', 'S']
+
+    for image_type in ref_test_type:
+        ref_test_image_path = Path(path_of_fire_dataset) / 'Images' / image_type
+    
+        if not Path(ref_test_image_path / 'Mosaicing').exists():
+            organize_folder(parent_folder=ref_test_image_path, categories=distorsion_categories, folder_names=distrorsion_type)
+        else: 
+            standard_log.info(f'the folder {ref_test_image_path} already organized')
+        
+
+
 
 #                                      =============     AIRLAB    ==================
 
