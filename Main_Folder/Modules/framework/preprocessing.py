@@ -258,9 +258,16 @@ def crop_image_advance(
                    'w_f': final_width,
                    'image_center': image_center_coords,
                    'corner_coords': new_O_O new coordinate respecting the original image dimension of the high left corner,useful to the trasformation of decropped H
- 
+    NOTE for the same setup of DRMINE notebook for crop, as tested it has to be:
+
+            new_O_O = [485, 485]; 
+            crop_style='shrink_to_fit'; 
+            centred=False
+            crop_dict = {'final_height' : 1941, 'final_width' : 1941}
+            
     A cropped_image (np.ndarray): the cropped image as a tensor of shape (1, C, h1, w1)
     '''
+    
     # define dict for crop, depending on type
     if isinstance(config_dict, dict):
         crop_dict = config_dict
