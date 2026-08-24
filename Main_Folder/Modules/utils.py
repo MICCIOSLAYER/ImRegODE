@@ -576,7 +576,10 @@ def tensor_img_rgb2bn(imgrgb: torch.Tensor | np.ndarray,
     img_rgb = imgrgb.squeeze().detach().cpu()
     if img_rgb.ndim == 2: # single channel image
         return img_rgb
-    elif img_rgb.ndim == 3 and img_rgb.shape[0] == 3: # multi-channel image
+    elif img_rgb.ndim == 3:
+        if img_rgb.shape[-1] == 3:
+            img_rgb = permute_channel_layout(image=img_rgb, target_format='C**')
+        
         if normalization_type == 'same':
             img_bn = img_rgb.mean(dim=0)
         elif normalization_type == 'humansensitivity':
