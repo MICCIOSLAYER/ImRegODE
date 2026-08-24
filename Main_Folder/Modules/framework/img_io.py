@@ -149,7 +149,7 @@ def organize_fire_dataset_framework_for_project():
     path_of_fire_dataset = get_root_path() / 'Main_Folder' /'Modules'/'dataset' / 'FIRE'
 
     if not path_of_fire_dataset.exists() or not any(path_of_fire_dataset.iterdir()):
-        raise ValueError(f'the {path_of_fire_dataset} does not contain any FIRE dataset, download it again and put it in {download_path_of_fire_dataset}')
+        raise ValueError(f'the {path_of_fire_dataset} does not contain any FIRE dataset, download it again and put it in {path_of_fire_dataset}')
     
     ref_test_type = ['Reference','Test']
     ref_test_categories = ['_1', '_2']
