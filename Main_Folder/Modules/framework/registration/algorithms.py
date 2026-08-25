@@ -796,7 +796,7 @@ def wrapper_drmine_registration_loop(
         registration_name: Optional[str] the name of the dictionary in the config_dict
         network_initializer (Callable[..., dict[str, nn.Module]]): initializer of the networks useful for the registration loop
         optimizer_initializer (Callable[]): optimizer initialization, with models and parameter of interest
-        parameter_for_registration (dict): parameter useful for registration 
+        parameter_for_registration (dict): parameter extracted by extract_registration_params, it has to have: 'reference_lst', 'test_lst', 'xy_lst', 'ind_lst'
         sample_dict (SampleDict): input point of data, complete and ordered in a typedDict datatype
         config_dict (dict): dictionary of configuration, if different from the yaml configuaration obj: it has to have the following keys:
             'lr', 'n_iterations', 'sampling_ratio', 'patience', 'min_delta'; 'lr' has to be a dict with the following structure:{'MINE': 0.01, 'HomographyNet': {'vL': 0.001, 'v1': 1e-05}}
