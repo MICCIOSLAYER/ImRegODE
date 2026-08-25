@@ -1,6 +1,6 @@
 # script to manage all classes regarding data management:
 
-from typing import  Callable, TypedDict, Optional, Tuple, Dict, List, Sequence, Required, NotRequired, Union, Literal
+from typing import  Callable, TypedDict, Optional, Tuple, Dict, List, Sequence, Required, NotRequired, Union, Literal, Any
 from pathlib import Path
 import torch
 from datetime import datetime
@@ -58,6 +58,7 @@ class SampleDict(TypedDict):
     
     sample_name : NotRequired[str]
     nChannel : NotRequired[int]
+    extras: NotRequired[dict[str, Any]]
 
 
 
