@@ -60,6 +60,8 @@ def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
     ---------
 
         dict: the dict has to be almost on the same type of SampleDict to better flexibility during pipeline
+            the shape of tensors will be in form [B, C, H, W];
+            The images are already normalized
     '''
     preprocessed_sample = sample_dict
     
@@ -139,22 +141,40 @@ def airlab_preprocessing(sample_dict : SampleDict,
 
 
 def drmine_preprocessing(sample_dict : SampleDict, 
-                       config_dict: dict = _default_framework_cfg
+                       config_dict: dict | FrameworkConfig = _default_framework_cfg, # FIXME registrations.drmine
                        )-> dict:
     '''
     A preprocessing function to adjust the images for the registration pipeline using DeepReg. It takes a sample dictionary and a configuration dictionary as input and returns a preprocessed sample dictionary.
 
     Args:
         sample_dict (SampleDict): A dictionary containing the reference and test samples, their paths, and the sample name.
-        config_dict (dict): A dictionary containing configuration parameters for preprocessing.
+        config_dict (dict): A dictionary containing configuration parameters for preprocessing. Better to use the FrameworkConfig data type
     Returns:
         SampleDict: A dictionary containing the preprocessed reference and test samples.
     '''
+   
 
     transformations = None
     preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
                                                 config_dict=config_dict,
                                                 transformations=transformations)
+    crop_dimension = {'final_height' : 1941, 'final_width' : 1941}
+    crop_dict, cropped_reference = crop_image_advance(original_image = preprocessed_sample['reference_sample'],
+                                                      config_dict=crop_dimension,
+                                                      centred=False,
+                                                      new_O_O=[485,485],
+                                                      )
+    _, cropped_test = crop_image_advance(original_image = preprocessed_sample['test_sample'],
+                                                      config_dict=crop_dimension,
+                                                      centred=False,
+                                                      new_O_O=[485,485],
+                                                      )
+    preprocessed_sample['reference_sample'] = cropped_reference
+    preprocessed_sample['test_sample'] = cropped_test
+    preprocessed_sample.setdefault("extras", {})
+    preprocessed_sample['extras']['crop_dict'] = crop_dict
+    preprocessed_sample = coupled_gaussian_pyramid(sample_dict=preprocessed_sample, 
+                                                   config_dict = config_dict)
     return preprocessed_sample
 
 
@@ -175,6 +195,7 @@ def elastix_preprocessing(sample_dict : SampleDict,
     preprocessed_sample = general_preprocessing(sample_dict = sample_dict,
                                                 config_dict=config_dict,
                                                 transformations=transformations)
+    
     return preprocessed_sample
 
 
@@ -227,7 +248,7 @@ def crop_images(moving_image : Path | torch.Tensor,
 
 def crop_image_advance(
         original_image: torch.Tensor | np.ndarray,
-        config_dict : dict | FrameworkConfig,
+        config_dict : dict | FrameworkConfig, # FIXME change in crop_dict
         crop_mode: Optional[Literal['area_proportion', 'area_ratio','keep_props']] = None,
         
         new_O_O : Optional[Sequence[int]]= None,
@@ -250,7 +271,7 @@ def crop_image_advance(
         centred (Optional[centred_dict], optional): to define if the cropped image centre and the original image centre are the same
         crop_style ( Literal): define if keeps the dimension of the crop as costant sliding if outside the box or stop at the box, modifing the final_height and final_width
         
-        config_dict(dict): the dict from the yaml configuration
+        config_dict(dict): the dict from which get crop infos on final dimensions, if a dict it has to have 'final_height' and 'final_width' as mandatory keys
 
     Returns:
     Tuple of a cropped dict and a cropped image as a tensor of 
@@ -437,7 +458,7 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
 
     Returns
     -------
-    SampleDict: updated sample dcit with the pyramids of images for both test and reference images
+    SampleDict: updated sample dict with the pyramids of images for both test and reference images
 
     '''   
     
