@@ -32,7 +32,7 @@ def yaml_config_setup(yaml_path: Path,
     '''
     
 
-    default_config = {'registrations':{'DRMINE_original':{'n_iterations': 500,
+    default_config = {'registrations':{'DRMINE_original':{'n_iterations': 0,
                                                 'histo_bins': 64,
                                                 'min_delta': float('inf'),
                                                 'n_neurons': 100,
@@ -143,8 +143,21 @@ class FrameworkConfig:
     def __init__(self,
                     yaml_path: Path= yaml_file_path,
                     priority : Literal['personal', 'default'] = 'personal'):
+        self.yaml_path = yaml_path
+        self.priority = priority
         self._config_dict = yaml_config_setup(yaml_path=yaml_path, priority=priority)
 
+    def reload_yaml(self):
+        new_config=yaml_config_setup(yaml_path=self.yaml_path, 
+                                     priority='personal')
+        self._config_dict.clear()
+        return self._config_dict.update(new_config)
+
+    def reset_default(self):
+        new_config=yaml_config_setup(yaml_path=self.yaml_path, 
+                                        priority='default')
+        self._config_dict.clear()
+        return self._config_dict.update(new_config)
 
     @property
     def config_dict(self):
@@ -169,6 +182,7 @@ class FrameworkConfig:
     @property
     def registrations(self):
         return self._config_dict['registrations']
+
 
 
     
