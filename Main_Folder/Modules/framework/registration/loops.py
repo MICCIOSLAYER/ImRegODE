@@ -46,10 +46,14 @@ def extract_registration_params(sample_dict : SampleDict,
   
   # ======== GET VALS from CONFIG_DICT=============
 
-  if isinstance(config_dict, FrameworkConfig):
-    parameter_dict_configuration = config_dict.registrations['DRMINE_original']
-  elif isinstance(config_dict, dict):
+  
+    
+
+  if isinstance(config_dict, dict):
       parameter_dict_configuration = config_dict
+  else:
+      parameter_dict_configuration = config_dict.registrations['DRMINE_original']
+  
 
   
   sampling= parameter_dict_configuration['sampling_ratio']
