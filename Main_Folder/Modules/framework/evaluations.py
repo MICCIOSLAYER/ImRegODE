@@ -3,13 +3,15 @@
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.configuration_setting.yaml_configuration import  FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from typing import Optional, Union, Literal
+from typing import Optional, Callable, Literal, Any, TYPE_CHECKING
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
 import numpy as np
 import torch
 from pathlib import Path
 
+if TYPE_CHECKING:
+    from Main_Folder.Modules.framework.registration.networks  import HomographyNet
 standard_log = get_logger(__name__)
 
 
@@ -40,6 +42,35 @@ def get_coords(image_name : str | SampleDict , #es A01
             reference_points.append([float(ref_x), float(ref_y)])
             test_points.append([float(test_x), float(test_y)])
     return test_points, reference_points
+
+
+def wrapper_naed_drmine(sample_dict: SampleDict,
+                        registration_dict : dict[str, Any],
+                        control_points_path: Path = FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'],
+                        image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
+                        )-> float:
+    '''
+    wrapper for naed_evaluation function to adapt to drmine registration original
+
+    Args:
+        sample_dict (SampleDict): dict of samples informations
+        registration_dict (dict[str, Any]): dict of registration containing registration results
+        control_points_path (Path, optional): view naed_evaluation. Defaults to FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'].
+        image_normalization (Literal[&#39;diagonal&#39; , &#39;coords_norm&#39;], optional): naed_evaluation. Defaults to 'coords_norm'.
+
+    Returns:
+        float: naed_evaluation
+    '''
+
+    image_couple_name = sample_dict['sample_name']
+    affine_matrix = registration_dict['affine_matrix']
+    if isinstance(affine_matrix, HomographyNet):
+        affine_matrix = affine_matrix(0)
+
+    evaluation = naed_evaluation(image_couple_name=image_couple_name,
+                                 affine_matrix=affine_matrix,
+                                 )
+    return evaluation
 
 
 def naed_evaluation(image_couple_name: str,
@@ -118,7 +149,26 @@ def naed_evaluation(image_couple_name: str,
     
     return naed_value
 
+def update_with_evaluation(sample_dict: SampleDict,
+                           registration_results : dict[str, Any],
+                           eval_fn : Callable[[SampleDict, dict[str,Any]],float],
+                           name_to_use : str = None
+                           ) -> dict[str, Any]:
+    '''
+    easy update for registration dict using naed and registration results
 
+    Args:
+        sample_dict (SampleDict): the dict containing all infos on samples as couple of referenec and test
+        registration_results (dict[str, Any]): the dict containing registration results in that format
+        eval_fn (Callable[[SampleDict, dict[str,Any]],float]): the evaluation function NOTE the format must be this one
+        name_to_use (str): the name to use in the registration_results dict. Default to None
+    Returns:
+        dict[str, Any]: the registration_results dict updated with the eval function value
+    '''
+    evaluation = eval_fn(sample_dict, registration_results)
+    key_name = name_to_use or eval_fn.__name__
+    registration_results[key_name] = evaluation
+    return registration_results
 
 def mattes_mutual_information(image1, image2, bins=32):
     """
