@@ -3,7 +3,7 @@
 from typing import Sequence, Callable, Optional, Union, Any, Tuple
 from Main_Folder.Modules.framework.registration.methods import initialize_networks, initialize_optimizer
 import Main_Folder.Modules.framework.registration.networks 
-from Main_Folder.Modules.utils import block_time, concatenate_paths
+from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
 from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
@@ -777,14 +777,15 @@ def airlab_mi_registration  (reference_image: AirlabImage,
 
 def wrapper_drmine_registration_loop(
         
-        parameter_for_registration:dict,
+        
         sample_dict: SampleDict,
         config_dict: dict| FrameworkConfig,
+        parameter_for_registration: dict = None , # output of extract_registration_param
         model_nets : Optional[dict]= None,
         
         loss_fn : Callable[..., Union[float, Sequence[float]]]=multi_resolution_loss,
-        network_classes : Optional[dict[str, type[nn.Module]]] = {},
-        network_initialization_params : dict = {},
+        network_classes : Optional[dict[str, type[nn.Module]]] = None,
+        network_initialization_params : dict = None,
         early_stopping: bool = False,
         progression_bar : bool = True,      
         device : torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -796,7 +797,7 @@ def wrapper_drmine_registration_loop(
         registration_name: Optional[str] the name of the dictionary in the config_dict
         network_initializer (Callable[..., dict[str, nn.Module]]): initializer of the networks useful for the registration loop
         optimizer_initializer (Callable[]): optimizer initialization, with models and parameter of interest
-        parameter_for_registration (dict): parameter extracted by extract_registration_params, it has to have: 'reference_lst', 'test_lst', 'xy_lst', 'ind_lst'
+        parameter_for_registration (dict): parameter extracted by extract_registration_params, it has to have: 'reference_lst', 'test_lst', 'xy_lst', 'ind_lst'. Default to {}
         sample_dict (SampleDict): input point of data, complete and ordered in a typedDict datatype
         config_dict (dict): dictionary of configuration, if different from the yaml configuaration obj: it has to have the following keys:
             'lr', 'n_iterations', 'sampling_ratio', 'patience', 'min_delta'; 'lr' has to be a dict with the following structure:{'MINE': 0.01, 'HomographyNet': {'vL': 0.001, 'v1': 1e-05}}
@@ -810,7 +811,7 @@ def wrapper_drmine_registration_loop(
 
     if isinstance( config_dict, dict):
         drmine_registration_dict = config_dict
-    elif isinstance(config_dict, FrameworkConfig):
+    else:
         drmine_registration_dict = config_dict.registrations['DRMINE_original']
     
     
@@ -820,7 +821,12 @@ def wrapper_drmine_registration_loop(
     patience= drmine_registration_dict['patience']
     min_delta = drmine_registration_dict['min_delta']
 
-    network_initialization_params['MINE']['nChannel'] = sample_dict['nChannel']
+    if network_initialization_params is None:
+        network_initialization_params = {}
+
+    network_initialization_params.setdefault('MINE', {})['nChannel'] = sample_dict['nChannel']
+
+    
         
     # ========== ORGANIZE THE STRUCTURE============
     if network_classes:
@@ -842,8 +848,14 @@ def wrapper_drmine_registration_loop(
         pbar = range(iterations)
 
 
-    #=========== GET THE USEFUL PARAMS FOR THE TRAINING LOOP================== NOTE add information to parameter for registration to use it as registration dict
-    # FIXME adjust fns to not use of the assigning vals to variables
+    #=========== GET THE USEFUL PARAMS FOR THE TRAINING LOOP================== 
+    if parameter_for_registration is None:
+        from Main_Folder.Modules.framework.registration.loops import extract_registration_params
+
+        parameter_for_registration = extract_registration_params(sample_dict=sample_dict,
+                                                                 config_dict=config_dict,
+                                                                 device=device)
+        
     I_lst = parameter_for_registration['reference_lst']
     J_lst = parameter_for_registration['test_lst']
     xy_lst = parameter_for_registration['xy_lst']
@@ -857,7 +869,7 @@ def wrapper_drmine_registration_loop(
 
     optim_init =  initialize_optimizer(trasformation_model=net_lst['trasformation'],
                                       metric_model = net_lst['metric'],
-                                      trasformation_kwargs=lr_dict[type(net_lst['trasformation']).__name__], # NOTE net_lst contain objects already instantiated, so type(..) is compulosry
+                                      trasformation_lr=lr_dict[type(net_lst['trasformation']).__name__], # NOTE net_lst contain objects already instantiated, so type(..) is compulosry
                                       metric_lr=lr_dict[type(net_lst['metric']).__name__],
                                       optimizer_kwargs= {'amsgrad': True}) # NOTE this work
     
@@ -892,10 +904,19 @@ def wrapper_drmine_registration_loop(
     registration_dict['affine_matrix']= net_lst['trasformation']
     registration_dict ['execution_time'] = execution_time
     registration_dict['loss_history'] = loss_history # NOTE define also ITERATION_NUMS
-    registration_dict['v1_lr'] = lr_dict['HomographyNet'].get('v1', 1.e-5)
-    registration_dict['vL_lr']= lr_dict['HomographyNet'].get('vL', 1.e-3)
-    registration_dict['mine_lr'] =lr_dict['MINE'].get('lr', 1.e-2)
+    # use of flatten dict to construct a explicit lr_dict for data collector
+    lr_dict_flatten = get_flatten_dict(lr_dict)
+    for net_lr in lr_dict_flatten.keys():
+        for net in net_lst.values():
+            if type(net).__name__ not in net_lr:
+                continue
+            else: 
+                registration_dict[net_lr] = lr_dict_flatten[net_lr]
+    #registration_dict['v1_lr'] = lr_dict['HomographyNet'].get('v1', 1.e-5)
+    #registration_dict['vL_lr']= lr_dict['HomographyNet'].get('vL', 1.e-3)
+    #registration_dict['mine_lr'] =lr_dict['MINE'].get('lr', 1.e-2)
     registration_dict['index_sampling'] = sampling
+
     if early_stopping:
         registration_dict['patience'] = patience
         registration_dict['best_loss']= best_loss
