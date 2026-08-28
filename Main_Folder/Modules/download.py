@@ -37,6 +37,7 @@ def download_file(
     try:
         with open(file_path, 'r') as f:
             standard_log.warning(f'the {file_path} already exists')
+            return
     except FileNotFoundError:
         request = requests.get(url=url)
         if not request.ok:
