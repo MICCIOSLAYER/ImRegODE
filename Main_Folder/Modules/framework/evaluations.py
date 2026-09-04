@@ -3,6 +3,8 @@
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.configuration_setting.yaml_configuration import  FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
+from Main_Folder.Modules.framework.registration.networks  import HomographyNet
+from Main_Folder.Modules.framework.postprocessing import unnormalize_matrix, decrop_matrix
 from typing import Optional, Callable, Literal, Any, TYPE_CHECKING
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
@@ -10,8 +12,8 @@ import numpy as np
 import torch
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from Main_Folder.Modules.framework.registration.networks  import HomographyNet
+
+    
 standard_log = get_logger(__name__)
 
 
@@ -61,14 +63,21 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
     Returns:
         float: naed_evaluation
     '''
+    
+    
 
     image_couple_name = sample_dict['sample_name']
     affine_matrix = registration_dict['affine_matrix']
     if isinstance(affine_matrix, HomographyNet):
         affine_matrix = affine_matrix(0)
+    image_shape = (sample_dict['extras']['crop_dict']['h_f'],sample_dict['extras']['crop_dict']['w_f'])
 
+    original_affine_matrix = decrop_matrix(H =unnormalize_matrix(H=affine_matrix,
+                                                                 image_shape=image_shape),
+                                                                 offset_y0x0=sample_dict['extras']['crop_dict']['corner_coords'],)
+    
     evaluation = naed_evaluation(image_couple_name=image_couple_name,
-                                 affine_matrix=affine_matrix,
+                                 affine_matrix=original_affine_matrix,
                                  )
     return evaluation
 
