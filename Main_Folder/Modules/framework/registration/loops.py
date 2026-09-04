@@ -1,6 +1,6 @@
 # all functions to be used inside the registration loop
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import  permute_channel_layout, tensor_img_rgb2bn, get_tensor
+from Main_Folder.Modules.utils import  permute_channel_layout, tensor_img_rgb2bn, get_tensor, get_coords_normalization_map
 from Main_Folder.Modules.framework.preprocessing import normalize_img
 from Main_Folder.Modules.framework.postprocessing import get_warped_coords
 from Main_Folder.Modules.framework.data_classes import SampleDict
@@ -31,8 +31,8 @@ def extract_registration_params(sample_dict : SampleDict,
 
   Returns
   -------
-  dict: {'I_lst': I_lst,  list[torch.Tensor] the image pyramid of the fixed image listed as torch tensor of normalized value as np.float32
-  'J_lst': J_lst,  list[torch.Tensor] the image pyramid of the moving image listed as torch tensor of normalized value as np.float32
+  dict: {'reference_lst': reference_lst,  list[torch.Tensor] the image pyramid of the fixed image listed as torch tensor of normalized value as np.float32
+  'test_lst': test_lst,  list[torch.Tensor] the image pyramid of the moving image listed as torch tensor of normalized value as np.float32
   'x_': x_, list[torch.Tensor] the x coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
   'y_': y_, list[torch.Tensor] the y coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
   'xy_': xy_lst,  list[torch.Tensor] the coordinates for the homography mapping
@@ -89,13 +89,20 @@ def extract_registration_params(sample_dict : SampleDict,
     widths_lst.append(width_)
 
     y_, x_ = torch.meshgrid([torch.arange(0,height_).float().to(device), torch.arange(0,width_).float().to(device)], indexing='ij')
-    y_, x_ = 2.0*y_/(height_-1) - 1.0, 2.0*x_/(width_-1) - 1.0 # normalization [0, 0] -> [-1, -1], [h,w] -> [1, 1]
-    xy_ = torch.stack([x_,y_],2)
+    normalization_map = get_coords_normalization_map(height=height_, 
+                                                     width_=width_, 
+                                                     normalization_type ='H-1',
+                                                     data_type=torch.float32,
+                                                     device=device)
+
+    stacked_coords = torch.stack([x_, y_, torch.ones_like(x_)]).reshape(3, -1)
+    stacked_norm_coords = torch.matmul(normalization_map, stacked_coords)
+    xy_ = stacked_norm_coords.reshape(3, height_, width_)[:2].permute(1,2,0)
     xy_lst.append(xy_)
   return {'reference_lst' : reference_lst,
           'test_lst': test_lst,
-          'x_' : x_,
-          'y_': y_,
+          'x_' : x_, # NOTE not a list
+          'y_': y_, # NOTE not a list
           'xy_lst': xy_lst,
           'ind_lst': ind_lst,
           'heights_lst': heights_lst,
