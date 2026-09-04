@@ -10,6 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.utils import get_root_path, get_dirs_of
+from datetime import datetime
 import os
 from torchvision import transforms
 import random 
@@ -232,6 +233,7 @@ class Registration_Data_Collector:
     '''
     def __init__(self):
         self.collection = {}
+        self.notes= [] # NOTE attribute to add notes on the collector
         self.logs =  get_logger(f'{type(self).__module__}.{type(self).__name__}')
 
     def add_registration_data(self,
@@ -259,9 +261,10 @@ class Registration_Data_Collector:
             self.collection[image_pair_name] = {}
         for key, value in registration_data.items(): #FIXME be more specific on which data to add 
             try:
-                if value.device == 'cuda':
+                if isinstance(value, torch.Tensor):
                     value = value.detach().cpu()
-            except:
+            except Exception as e:
+                self.logs.error(f"Error occurred while processing registration data for {image_pair_name} image, key: {key}, value {value}: {e}")
                 pass
             if filtred_data and filtred_data != ['']:
                 if key  not in filtred_data:
@@ -272,7 +275,15 @@ class Registration_Data_Collector:
             self.registration_name = registration_name
         else:
             self.registration_name= f'registration_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
-        
+
+    def annotations(self,
+                    annotate: str
+                    )->None:
+        '''
+        to document the collector with notes, to be used for future reference
+        '''
+        annotate = f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - {annotate}'
+        self.notes.append(annotate)
 
     @property
     def get_dataframe(self) -> pd.DataFrame:
