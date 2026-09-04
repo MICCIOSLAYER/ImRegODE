@@ -91,7 +91,6 @@ def extract_registration_params(sample_dict : SampleDict,
     y_, x_ = torch.meshgrid([torch.arange(0,height_).float().to(device), torch.arange(0,width_).float().to(device)], indexing='ij')
     normalization_map = get_coords_normalization_map(height=height_, 
                                                      width_=width_, 
-                                                     normalization_type ='H-1',
                                                      data_type=torch.float32,
                                                      device=device)
 
