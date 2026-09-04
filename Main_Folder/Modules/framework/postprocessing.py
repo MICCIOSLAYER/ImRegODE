@@ -46,24 +46,28 @@ def unnormalize_matrix(H: torch.Tensor,
 
 
 def decrop_matrix(H: torch.Tensor,
-                    offset_x0 : int,
-                    offset_y0 : int) -> torch.Tensor:
+                    offset_y0x0: tuple[int, int]) -> torch.Tensor:
     '''
     Since the homography is calculated on cropped images,
     this function decrop the unnormalized homography matrix to be applied on the original image
 
     Parameters:
     H (torch.Tensor): The unnormalized homography matrix.
-    offset_x0 (int): The x offset of the cropping. It is the number of pixel corresponding to the high left corner of the image, coord x.
-    offset_y0 (int): The y offset of the cropping. It is the number of pixel corresponding to the high left corner of the image, coord y.
+    offset_y0x0 (tuple[int, int]): The (y0, x0) offsets of the cropping. It is the number of pixels corresponding to the top-left corner of the cropped image.
 
     '''
-    tx= -offset_x0
-    ty= -offset_y0
-    transformation_map_crop_to_full = [[1, 0, tx], [0, 1, ty], [0, 0, 1]]
-    
-    decropped_affine_matrix = torch.matmul(torch.matmul(torch.linalg.inv(transformation_map_crop_to_full), H), transformation_map_crop_to_full)
-    return torch.tensor(decropped_affine_matrix).to(H.device)
+    H = H.detach().cpu()
+    ty, tx = offset_y0x0
+    transformation_map_full_to_crop = torch.tensor([[1, 0, -tx], 
+                                                    [0, 1, -ty], 
+                                                    [0, 0, 1]], dtype=H.dtype, device=H.device)
+    C = transformation_map_full_to_crop # NOTE useful for verbose pourpose
+
+    C_inv = torch.linalg.inv(transformation_map_full_to_crop)
+
+    decropped_affine_matrix = C_inv @ H @ C
+
+    return decropped_affine_matrix
 
 
 
