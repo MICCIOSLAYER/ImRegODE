@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 #import yaml
 from typing import  Literal, Optional, Any, Union
+from collection.abc import Iterable
 import numpy as np
 import SimpleITK as sitk
 from collections.abc import Mapping
@@ -340,6 +341,27 @@ def get_flatten_dict(complex_dict : dict,
             flatten_dict.update(get_flatten_dict(complex_dict=v, separator=separator, final_key = current_key))
             
     return flatten_dict
+
+
+def has_required_keys(input_dict:dict,
+                      required_keys : Iterable[str],
+                      )->bool:
+    '''
+    validation of a dictionary throught its keys
+
+    Args:
+        input_dict (dict): the dict to validate
+        required_keys (Iterable[str]): the list of required keys that validate the input_dict
+
+    Returns:
+        bool: true if the input_dict has all the required keys, False otherwise
+    '''
+    missed_keys = set(required_keys) - set(input_dict.keys())
+    if missed_keys:
+        standard_log.warning(f'The input dictionary is missing required keys: {missed_keys}')
+        return False
+
+    return True
 
 
 def permute_channel_layout(
