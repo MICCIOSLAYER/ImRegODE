@@ -6,25 +6,38 @@ import sys
 from typing import Sequence, Union, Protocol, Any, runtime_checkable
 import matplotlib.pyplot as plt
 from pathlib import Path
-from Main_Folder.Modules.utils import get_tensor
+from Main_Folder.Modules.utils import get_tensor, get_coords_normalization_map
 
 from Main_Folder.Modules.framework.img_io import tensor_img_to_sitk
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 
 
 
+#                                   ==============================
+#                                    AFFINE/HOMO MATRIX OPERATIONS
+#                                   ==============================
+
 
 def unnormalize_matrix(H: torch.Tensor,
                         image_shape: list[int, int],
-                        transformation_map : list = []) -> torch.Tensor:
+                        transformation_map : torch.Tensor = None) -> torch.Tensor:
     '''
-    since the homography is calculated on normalized coordinates this function unnormalize the homography matrix to be applied on the original image
+    Denormalize the matrix using the matrix of normalization and calculating its original: 
+    
+
+    Args:
+        H (torch.Tensor): the homography matrix to denormalize
+        image_shape (list[int, int]): the shape of image, to get H, W in a format (H, W)
+        transformation_map (torch.Tensor, optional): the normalization matrix. Defaults to None.
+
+    Returns:
+        torch.Tensor: the denormalized homography matrix
     '''
     normalized_affine_matrix = H.cpu().detach().numpy()
     h, w = image_shape
-    if transformation_map == []:
-        transformation_map = [[2/(w-1), 0, -1], [0, 2/(h-1), -1], [0, 0, 1]] #NOTE definiscila a partire da alpha e beta così come norm...
-    unnormalized_affine_matrix = np.linalg.inv(np.matmul(np.matmul(np.linalg.inv(transformation_map), normalized_affine_matrix), transformation_map))
+    if transformation_map is None:
+        transformation_map = get_coords_normalization_map(h, w, data_type= H.dtype, device=H.device)
+    unnormalized_affine_matrix = torch.matmul(torch.matmul(torch.linalg.inv(transformation_map), normalized_affine_matrix), transformation_map)
     return torch.tensor(unnormalized_affine_matrix).to(H.device)
 
 
@@ -46,8 +59,11 @@ def decrop_matrix(H: torch.Tensor,
     ty= -offset_y0
     transformation_map_crop_to_full = [[1, 0, tx], [0, 1, ty], [0, 0, 1]]
     
-    decropped_affine_matrix = np.matmul(np.matmul(np.linalg.inv(transformation_map_crop_to_full), H), transformation_map_crop_to_full)
+    decropped_affine_matrix = torch.matmul(torch.matmul(torch.linalg.inv(transformation_map_crop_to_full), H), transformation_map_crop_to_full)
     return torch.tensor(decropped_affine_matrix).to(H.device)
+
+
+
 
 
 def get_warped_coords(test_coords:torch.Tensor |np.ndarray, 
@@ -80,7 +96,9 @@ def get_warped_coords(test_coords:torch.Tensor |np.ndarray,
     return transformed_points_int_list
 
 
-# ==================== SITK PORSTPROCESSING ======================
+
+
+#                   ==================== SITK PORSTPROCESSING ======================
 
 
 def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME to be adjusted to wrappers, preprocessing, dataset and config_dict
