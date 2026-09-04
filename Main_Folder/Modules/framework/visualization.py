@@ -93,18 +93,27 @@ def show_images(image_list: Sequence[Image_Type] | Image_Type,
     return 
 
 
-def show_image_and_reference_points(image: torch.Tensor,
+def show_image_and_reference_points(image: Image_Type,
                                     coordinates: list[list[float]],                                    
                                     save_title : str = None,
                                     uniform_color : bool = True,
-                                    ):
-    ''''''
+                                    )-> Optional[Path]:
+    '''
+    Show the image with the reference points over it, and save it if a title is provided
+
+    Args:
+        image (Image_Type): the image to show
+        coordinates (list[list[float]]): the coordinates of ground truth points to show over the image
+        save_title (str, optional): the title to save the image. Defaults to None.
+        uniform_color (bool, optional): whether to use a uniform color for all points. Defaults to True.
+        
+    '''
 
     
     x_test = [test_point[0] for test_point in coordinates]
     y_test = [test_point[1] for test_point in coordinates]
-    result_image_folder = FrameworkConfig().path_dict['RESULTS'] /'ImgRes'
-    plt.imshow(image.permute(1,2,0).detach().cpu().numpy())
+    
+    plt.imshow(image_to_numpy(image=image))
     plt.axis('off')
     if not uniform_color:
         colors = plt.cm.jet(np.linspace(0, 1, len(coordinates)))
@@ -112,10 +121,14 @@ def show_image_and_reference_points(image: torch.Tensor,
         colors = ['black'] * len(coordinates)
     plt.scatter(x_test, y_test, c=colors, s=1)
     if save_title is not None:
+        result_image_folder = get_root_path() / 'Results' / 'ImgRes'
         save_path=  Path(result_image_folder / f'{save_title}.png')
         if save_path.exists():
             save_path= Path(f'{save_path.split('.'[0])}_{get_data_time()}.png')
         plt.savefig(save_path)
+        return save_path
+    plt.show()
+    return
 
 
 def elastix_show_difference_image(reference_image: itk.Image,
