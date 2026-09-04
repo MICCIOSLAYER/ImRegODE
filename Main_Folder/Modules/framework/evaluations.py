@@ -74,7 +74,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
 
     original_affine_matrix = decrop_matrix(H =unnormalize_matrix(H=affine_matrix,
                                                                  image_shape=image_shape),
-                                                                 offset_y0x0=sample_dict['extras']['crop_dict']['corner_coords'],)
+                                                                 offset_y0x0=sample_dict['extras']['crop_dict']['corner_coords'])
     
     evaluation = naed_evaluation(image_couple_name=image_couple_name,
                                  affine_matrix=original_affine_matrix,
