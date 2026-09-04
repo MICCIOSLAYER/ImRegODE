@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 #import yaml
 from typing import  Literal, Optional, Any, Union
-from collection.abc import Iterable
+from collections.abc import Iterable
 import numpy as np
 import SimpleITK as sitk
 from collections.abc import Mapping
