@@ -272,6 +272,9 @@ def get_saving_name(format : ExtensionType,
 # ======================================================================================
 
 
+#-------------------------------------------DICT OBJS------------------------------------
+
+
 def deep_update(
     base_dict: dict,
     higher_priority_dict: dict,
@@ -363,6 +366,8 @@ def has_required_keys(input_dict:dict,
 
     return True
 
+
+#--------------------------------------TENSOR OBJS-------------------------------------------
 
 def permute_channel_layout(
     image: torch.Tensor,
@@ -514,7 +519,44 @@ def check_same_device(*objects,
     return ref_device
 
 
+def get_coords_normalization_map(height:int,
+                                 width:int,
+                                 normalization_type: Literal['H-1', 'H'] = 'H-1',
+                                 data_type : torch.dtype = torch.float32,
+                                 device : torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+                                 )->torch.Tensor:
+    '''
+    Generate the normalization map for coordinates following the format X' = N @ X, where X is the vector/tensor (x, y, 1), N is a torch.Tensor
 
+    Args:
+        height (int): the height of the image
+        width (int): the width of the image
+        normalization_type (Literal['H-1', 'H'], optional): the type of normalization map to use. Defaults to 'H-1'. NOTE this param is updatable
+        data_type (dtype, optional): the data type for the normalization map. Defaults to torch.float32.
+        device (torch.device, optional): the device to use for the normalization map. Defaults to torch.device('cuda' if torch.cuda.is_available() else 'cpu').
+
+
+    Returns:
+        torch.Tensor: the normalization map to use in a matmul with the original coords
+    '''
+    if normalization_type == 'H-1':
+        # Implementation for H-1 normalization
+        normalization_map = torch.tensor([[2.0/(width -1), 0.0, -1.0],
+                                              [0.0, 2.0/(height - 1), -1.0],
+                                              [0.0, 0.0, 1.0]],
+                                               dtype=data_type,
+                                               device=device)
+        
+        
+    elif normalization_type == 'H':
+        # Implementation for H normalization
+        normalization_map = torch.tensor([[2.0/(width), 0.0, -1.0],
+                                          [0.0, 2.0/(height), -1.0],
+                                          [0.0, 0.0, 1.0]],
+                                          dtype=data_type,
+                                          device=device)
+        
+    return normalization_map
 
 
 
