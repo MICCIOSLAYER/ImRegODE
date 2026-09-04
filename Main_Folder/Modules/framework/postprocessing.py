@@ -33,11 +33,14 @@ def unnormalize_matrix(H: torch.Tensor,
     Returns:
         torch.Tensor: the denormalized homography matrix
     '''
-    normalized_affine_matrix = H.cpu().detach().numpy()
+    normalized_affine_matrix = H.cpu().detach()
     h, w = image_shape
     if transformation_map is None:
-        transformation_map = get_coords_normalization_map(h, w, data_type= H.dtype, device=H.device)
-    unnormalized_affine_matrix = torch.matmul(torch.matmul(torch.linalg.inv(transformation_map), normalized_affine_matrix), transformation_map)
+        N_map = get_coords_normalization_map(height=h, width=w, data_type= H.dtype, device=H.device)
+    N_inv_map = torch.linalg.inv(N_map)
+
+    unnormalized_affine_matrix = N_inv_map @ normalized_affine_matrix @ N_map
+
     return torch.tensor(unnormalized_affine_matrix).to(H.device)
 
 
