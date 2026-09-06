@@ -1,6 +1,6 @@
 # script to manage all classes regarding data management:
 
-from typing import  Callable, TypedDict, Optional, Tuple, Dict, List, Sequence, Required, NotRequired, Union, Literal, Any
+from typing import  Self, TypedDict, Optional, Tuple, Dict, List, Sequence, Required, NotRequired, Union, Literal, Any
 from pathlib import Path
 import torch
 from datetime import datetime
@@ -9,9 +9,10 @@ import sys
 from torch.utils.data import Dataset, DataLoader
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import get_root_path, get_dirs_of
+from Main_Folder.Modules.utils import get_root_path, get_dirs_of, _move_to_cpu
 from datetime import datetime
 import os
+import json
 from torchvision import transforms
 import random 
 import pandas as pd
@@ -276,6 +277,8 @@ class Registration_Data_Collector:
         else:
             self.registration_name= f'registration_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
+    # ----------------------------- USEFUL METHODS-------------------------------------
+
     def annotations(self,
                     annotate: str
                     )->None:
@@ -285,6 +288,33 @@ class Registration_Data_Collector:
         annotate = f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - {annotate}'
         self.notes.append(annotate)
 
+    @staticmethod
+    def _make_serializable(obj:Any):
+
+        if isinstance(obj, torch.Tensor):
+            return obj.detach().cpu().tolist()
+
+        if isinstance(obj, dict):
+            return {
+                k: Registration_Data_Collector._make_serializable(v)
+                for k, v in obj.items()
+            }
+
+        if isinstance(obj, list):
+            return [
+                Registration_Data_Collector._make_serializable(v)
+                for v in obj
+            ]
+
+        if isinstance(obj, tuple):
+            return tuple(
+                Registration_Data_Collector._make_serializable(v)
+                for v in obj)
+
+        return obj
+
+    #-------------VISUALIZATION----------------
+
     @property
     def get_dataframe(self) -> pd.DataFrame:
         '''
@@ -293,18 +323,42 @@ class Registration_Data_Collector:
         df = pd.DataFrame.from_dict(self.collection, orient="index")
         df.index.name = "image_pair_name"
         return df.reset_index().set_index('image_pair_name')
+
     
+    #---------------------------SAVE/LOAD------------------------
+
+
+
     def save_data(self, 
                   filename: Optional[str],
-                  fmt : Optional[str],
+                  fmt : Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'] = 'csv',
                   results_path :str | Path = frame_dict.path_dict['RESULTS'] ,
                   overwrite: bool = False,
-                  IN_COLAB: bool = False,
+                  IN_COLAB: bool = 'google.colab' in sys.modules,
                   )->Path:
-        '''Saving the collected data to a file in the specified format (csv or json or excel).
-        results_path as to be the directory where all esults are kept'''
+        '''
+        Saving the collected data to a file in the specified format (csv or json or excel).
+        results_path as to be the directory where all esults are kept
+
+        Args:
+            filename (Optional[str]): name of the file to save
+            fmt (Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'], optional): Format of the file to save. Defaults to 'csv'.
+            results_path (str | Path, optional): directory of results. Defaults to frame_dict.path_dict['RESULTS'].
+            overwrite (bool, optional): Flag to define if overwrite is admitted. Defaults to False.
+            IN_COLAB (bool, optional): Flag to define if the code is running in Google Colab. Defaults to False.
+
+        Raises:
+            ValueError: Unsupported format error if the specified format is not among the available ones.
+
+        Returns:
+            Path: The saving Path
+        '''
+        # setup of saving dirs
         filepath = Path(results_path / 'CSVResults')
+        filepath.mkdir(parents=True, exist_ok=True)
         picklepath = Path(results_path/ 'DataCollectors')
+        picklepath.mkdir(parents=True, exist_ok=True)
+
         if not filepath.exists():
             filepath.mkdir(parents=True, exist_ok=True)
         filename = filename or self.registration_name 
@@ -313,10 +367,19 @@ class Registration_Data_Collector:
         fmt = (fmt or Path(filename).suffix.lstrip('.')).lower()
         avaiable_formats = ['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle']
         if fmt not in avaiable_formats:
+            self.logs.warning(f"Unsupported or not yet disposable format: {fmt} defaulting to 'csv'.")
             fmt = 'csv'
-        
+
+
+        # setting main save body
         df = self.get_dataframe
+        payload={
+            'registration_name': self.registration_name,
+            'notes': self.notes,
+            'collection': self.collection
+        }
         filename = Path(filename).stem
+
         fmt = 'xlsx' if fmt in ('excel', 'xls', 'xlsx') else fmt
         path = filepath / f'{filename}.{fmt}'
 
@@ -326,26 +389,36 @@ class Registration_Data_Collector:
             path = filepath / f'{filename}.{fmt}'
         
         if fmt=='csv': 
+            df= self.get_dataframe
             df.to_csv(path, index=True)
-        elif fmt=='json':
-            df.to_json(path, orient="index")
+
         elif fmt=='xlsx':
+            df= self.get_dataframe
             df.to_excel(path)
+
+        elif fmt=='json':
+            serialized_payload = self._make_serializable(payload)
+            with open(path, 'w', encoding='utf-8') as json_file:
+                json.dump(serialized_payload, json_file, indent=4)
+            
+        
         elif fmt in ['pkl', 'pickle']:
+
             path = picklepath / f'{filename}.{fmt}'
             if path.exists() and not overwrite:
                 filename = f'{filename}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
                 path = picklepath / f'{filename}.{fmt}'
+
             if IN_COLAB:
                 torch.save(
-                    self,
+                    payload,
                     f=path,
                     pickle_module=pickle,
                     pickle_protocol=pickle.HIGHEST_PROTOCOL
                 )
             else:
                 with open(path, 'wb') as pickle_file:
-                    pickle.dump(self,
+                    pickle.dump(payload,
                                 pickle_file,
                                 pickle.HIGHEST_PROTOCOL)
         else:
@@ -353,6 +426,62 @@ class Registration_Data_Collector:
         return path
 
 
+    @classmethod
+    def load_collector(
+            cls,
+            filepath: Union[str, Path],
+            IN_COLAB: bool = 'google.colab' in sys.modules
+        ) -> Self:
+        '''
+        Load a Registration_Data_Collector from a file.
+
+        Args:
+            filepath (Union[str, Path]): Path to the file to load.
+            IN_COLAB (bool, optional): Flag to define if the code is running in Google Colab. Defaults to False.
+
+        Returns:
+            Registration_Data_Collector: The loaded Registration_Data_Collector instance.
+        '''
+
+        filepath = Path(filepath)
+        if not filepath.exists():
+            raise FileNotFoundError(f"The specified file does not exist: {filepath}")
+
+        collector = cls()
+        fmt = filepath.suffix.lower()
+
+        if fmt in ['.pkl', '.pickle']:
+            if IN_COLAB:
+                payload = torch.load(
+                    f=filepath,
+                    pickle_module=pickle,
+                    weights_only=False,
+                    map_location=torch.device('cpu')
+                )
+            else:
+                with open(filepath, 'rb') as pickle_file:
+                    payload = pickle.load(pickle_file)
+
+            collector.registration_name = payload.get('registration_name', 'Unknown')
+            collector.notes = payload.get('notes')
+            collector.collection = payload.get('collection', {})
+
+
+        elif fmt == '.csv':
+
+            df = pd.read_csv(
+                filepath,
+                index_col='image_pair_name',
+            )
+            collector.collection = df.to_dict(orient='index')
+            collector.registration_name = filepath.stem
+        else:
+            raise ValueError(f"Unsupported file format for loading: {filepath.suffix}. Only '.pkl' and '.pickle' are supported.")
+
+
+        return collector
+
+    
 
 
 def data_size_of_this(
