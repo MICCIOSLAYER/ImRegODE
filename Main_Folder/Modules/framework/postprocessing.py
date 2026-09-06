@@ -7,7 +7,7 @@ from typing import Sequence, Union, Protocol, Any, runtime_checkable
 import matplotlib.pyplot as plt
 from pathlib import Path
 from Main_Folder.Modules.utils import get_tensor, get_coords_normalization_map
-
+from Main_Folder.Modules.framework.registration.networks  import HomographyNet
 from Main_Folder.Modules.framework.img_io import tensor_img_to_sitk
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 
@@ -224,3 +224,30 @@ def get_affine_matrix_from_sitk_transform(sitk_transform: Union[sitk.AffineTrans
 
 
     return H
+
+
+def all_on_cpu(registration_results : dict,
+               
+               )->dict:
+    '''
+    fondamentally a wrapper for data collector to put all data from gpu to cpu, eventually
+
+    Args:
+        results (dict): the result dict
+        
+
+    Returns:
+        dict: the output dict where all data stored are on the cpu
+    '''
+
+    affine_matrix = registration_results.get('affine_matrix', [])
+    if isinstance(affine_matrix, HomographyNet):
+        registration_results['affine_matrix ']= affine_matrix(0).detach().cpu()
+
+    for k, v in registration_results.items():
+        if isinstance(v, dict):
+            registration_results[k] = all_on_cpu(v)
+        elif isinstance(v, torch.Tensor):
+            registration_results[k]=v.detach().cpu() 
+
+    return registration_results

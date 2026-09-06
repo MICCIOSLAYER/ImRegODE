@@ -654,3 +654,32 @@ def tensor_img_rgb2bn(imgrgb: torch.Tensor | np.ndarray,
     else:
         raise ValueError(f'the input shape must be in (C, H, W) or (B, C, H, W), got {imgrgb.shape}')
     return img_bn
+
+
+
+def _move_to_cpu(obj:Union[torch.Tensor, dict, list, tuple]) -> Union[torch.Tensor, dict, list, tuple]:
+    '''
+    move to cpu an object on cuda
+
+    Args:
+        obj (Union[torch.Tensor, dict, list, tuple]): input obj
+
+    Returns:
+        Union[torch.Tensor, dict, list, tuple]: same obj on cpu
+    '''
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu()
+
+    if isinstance(obj, dict):
+        return {
+            k: _move_to_cpu(v)
+            for k, v in obj.items()
+        }
+
+    if isinstance(obj, list):
+        return [_move_to_cpu(v) for v in obj]
+
+    if isinstance(obj, tuple):
+        return tuple(_move_to_cpu(v) for v in obj)
+
+    return obj
