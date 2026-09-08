@@ -434,6 +434,11 @@ class Registration_Data_Collector:
         ) -> Self:
         '''
         Load a Registration_Data_Collector from a file.
+        NOTE HOW TO USE THE METHOD: 
+
+        path_to_saved_data=collector_to_save.save_data(...)
+        loaded_collector = Registration_Data_Collector.load_collector(apth_to_saved_data)
+        loaded_collector NOTE this is already the wanted collector
 
         Args:
             filepath (Union[str, Path]): Path to the file to load.
@@ -449,35 +454,38 @@ class Registration_Data_Collector:
 
         collector = cls()
         fmt = filepath.suffix.lower()
+        try:
+            if fmt in ['.pkl', '.pickle']:
+                if IN_COLAB:
+                    payload = torch.load(
+                        f=filepath,
+                        pickle_module=pickle,
+                        weights_only=False,
+                        map_location=torch.device('cpu')
+                    )
+                else:
+                    with open(filepath, 'rb') as pickle_file:
+                        payload = pickle.load(pickle_file)
 
-        if fmt in ['.pkl', '.pickle']:
-            if IN_COLAB:
-                payload = torch.load(
-                    f=filepath,
-                    pickle_module=pickle,
-                    weights_only=False,
-                    map_location=torch.device('cpu')
-                )
-            else:
-                with open(filepath, 'rb') as pickle_file:
-                    payload = pickle.load(pickle_file)
+            elif fmt == '.csv':
+            
+                        df = pd.read_csv(
+                            filepath,
+                            index_col='image_pair_name',
+                        )
+                        collector.collection = df.to_dict(orient='index')
+                        collector.registration_name = filepath.stem
+        except Exception as e:
+            cls.logs.error(f'the {e} exception occurred')
+            payload = {}
 
-            collector.registration_name = payload.get('registration_name', 'Unknown')
-            collector.notes = payload.get('notes')
-            collector.collection = payload.get('collection', {})
+        collector.registration_name = payload.get('registration_name', 'Unknown')
+        collector.notes = payload.get('notes', [])
+        collector.collection = payload.get('collection', {})
 
 
-        elif fmt == '.csv':
-
-            df = pd.read_csv(
-                filepath,
-                index_col='image_pair_name',
-            )
-            collector.collection = df.to_dict(orient='index')
-            collector.registration_name = filepath.stem
-        else:
-            raise ValueError(f"Unsupported file format for loading: {filepath.suffix}. Only '.pkl' and '.pickle' are supported.")
-
+        
+        
 
         return collector
 
