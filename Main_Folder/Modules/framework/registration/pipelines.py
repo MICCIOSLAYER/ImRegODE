@@ -19,9 +19,9 @@ def run_registration_pipeline(
         config_dict : dict | FrameworkConfig,
         preprocessing_fn : Callable[[SampleDict, dict], SampleDict],
         registratoion_fn : Callable, # to typize
-        data_collection_fn : Callable [dict, [Path, Registration_Data_Collector]],
+        data_collection_fn : Callable[[dict], tuple[Registration_Data_Collector, Path |None]],
         save_results: bool = True
-        )->[Registration_Data_Collector, Optional[Path]]:
+        )->Tuple[Registration_Data_Collector, Optional[Path]]:
     '''
     _summary_
 
