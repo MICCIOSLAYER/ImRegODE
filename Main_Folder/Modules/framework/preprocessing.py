@@ -301,7 +301,7 @@ def crop_image_advance(
     if isinstance(area_ratio, str) and '/' in area_ratio:
         area_ratio = float(Fraction(area_ratio))
     standard_log.debug(f'the measure chosen for the crop\nfinal_height: {final_height}; final_width: {final_width}')
-    if new_O_O == None:
+    if new_O_O is None:
         new_O_O = [0, 0]
 
     if isinstance(original_image, np.ndarray): #NOTE shape it has to be in (C, H, W)
