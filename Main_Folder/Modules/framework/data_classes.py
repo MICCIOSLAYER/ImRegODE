@@ -19,7 +19,7 @@ import pandas as pd
 
 from PIL import Image as PImage
 
-frame_dict = FrameworkConfig()
+_fwc_dict = FrameworkConfig()
 root_path = get_root_path()
 standard_log = get_logger(__name__)
 
@@ -331,19 +331,19 @@ class Registration_Data_Collector:
 
     def save_data(self, 
                   filename: Optional[str],
-                  fmt : Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'] = 'csv',
-                  results_path :str | Path = frame_dict.path_dict['RESULTS'] ,
+                  fmt : Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'] = 'pkl',
+                  results_path :str | Path = _fwc_dict.path_dict['RESULTS'] ,
                   overwrite: bool = False,
                   IN_COLAB: bool = 'google.colab' in sys.modules,
                   )->Path:
         '''
         Saving the collected data to a file in the specified format (csv or json or excel).
-        results_path as to be the directory where all esults are kept
+        results_path as to be the directory where all the results are kept
 
         Args:
             filename (Optional[str]): name of the file to save
             fmt (Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'], optional): Format of the file to save. Defaults to 'csv'.
-            results_path (str | Path, optional): directory of results. Defaults to frame_dict.path_dict['RESULTS'].
+            results_path (str | Path, optional): directory of results. Defaults to _fwc_dict.path_dict['RESULTS'].
             overwrite (bool, optional): Flag to define if overwrite is admitted. Defaults to False.
             IN_COLAB (bool, optional): Flag to define if the code is running in Google Colab. Defaults to False.
 
@@ -442,7 +442,7 @@ class Registration_Data_Collector:
         Returns:
             Registration_Data_Collector: The loaded Registration_Data_Collector instance.
         '''
-
+        payload= {} # setting the default in case of error
         filepath = Path(filepath)
         if not filepath.exists():
             raise FileNotFoundError(f"The specified file does not exist: {filepath}")
