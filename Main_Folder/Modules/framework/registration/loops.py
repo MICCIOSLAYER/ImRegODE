@@ -19,94 +19,94 @@ def extract_registration_params(sample_dict : SampleDict,
                         
                         device : torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                         ) -> dict[str, Any]:
-  '''
-  it registers the images calculating the random index for the homography to compare the registration and optimize the corresponding value xy_
-  it also prepare the pyramidal images permuting the index position as (H,W,C) -> (C, H, W)
+    '''
+    it registers the images calculating the random index for the homography to compare the registration and optimize the corresponding value xy_
+    it also prepare the pyramidal images permuting the index position as (H,W,C) -> (C, H, W)
 
-  Parameters
-  ------------
-  sample_dict (SampleDict): the dict containing all information about the sample useful for registration loop
-  config_dict (dict): the dict representing the yaml configuration file
-  device (torch.device): to put the tensor on the correct device during execution and calcula
+    Parameters
+    ------------
+    sample_dict (SampleDict): the dict containing all information about the sample useful for registration loop
+    config_dict (dict): the dict representing the yaml configuration file
+    device (torch.device): to put the tensor on the correct device during execution and calcula
 
-  Returns
-  -------
-  dict: {'reference_lst': reference_lst,  list[torch.Tensor] the image pyramid of the fixed image listed as torch tensor of normalized value as np.float32
-  'test_lst': test_lst,  list[torch.Tensor] the image pyramid of the moving image listed as torch tensor of normalized value as np.float32
-  'x_': x_, list[torch.Tensor] the x coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
-  'y_': y_, list[torch.Tensor] the y coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
-  'xy_': xy_lst,  list[torch.Tensor] the coordinates for the homography mapping
-  'ind_': ind_lst,  list[torch.Tensor] the list of indeces from whose loss is calculated
-  'h_': h_lst, list[int] the heights of images in pyramid, necessary due downsampling
-  'w_': w_lstlist[int] the widths of images in pyramid, necessary due downsampling
-  }
+    Returns
+    -------
+    dict: {'reference_lst': reference_lst,  list[torch.Tensor] the image pyramid of the fixed image listed as torch tensor of normalized value as np.float32
+    'test_lst': test_lst,  list[torch.Tensor] the image pyramid of the moving image listed as torch tensor of normalized value as np.float32
+    'x_': x_, list[torch.Tensor] the x coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
+    'y_': y_, list[torch.Tensor] the y coordinates of fixed as torch tensor of normalized value as np.float64 for homography mapping
+    'xy_': xy_lst,  list[torch.Tensor] the coordinates for the homography mapping
+    'ind_': ind_lst,  list[torch.Tensor] the list of indeces from whose loss is calculated
+    'h_': h_lst, list[int] the heights of images in pyramid, necessary due downsampling
+    'w_': w_lstlist[int] the widths of images in pyramid, necessary due downsampling
+    }
 
-  '''
-  
-  
-  # ======== GET VALS from CONFIG_DICT=============
+    '''
+    
+    
+    # ======== GET VALS from CONFIG_DICT=============
 
-  
+    
+        
+
+    if isinstance(config_dict, dict):
+        parameter_dict_configuration = config_dict
+    else:
+        parameter_dict_configuration = config_dict.registrations['DRMINE_original']
     
 
-  if isinstance(config_dict, dict):
-      parameter_dict_configuration = config_dict
-  else:
-      parameter_dict_configuration = config_dict.registrations['DRMINE_original']
-  
+    
+    sampling= parameter_dict_configuration['sampling_ratio']
+    L = parameter_dict_configuration['pyramid']['gaussian_levels']
+    reference_pyramid= sample_dict['reference_pyramid']
+    test_pyramid = sample_dict['test_pyramid']
+    nChannel = sample_dict['nChannel']
+    
+    if not (0.0 < sampling <= 1.0) :
+        standard_log.error(f' the sampling ratio must be equal up to 1.0, so {sampling} will be set to 0.1 as default')
+        sampling = 0.1
 
-  
-  sampling= parameter_dict_configuration['sampling_ratio']
-  L = parameter_dict_configuration['pyramid']['gaussian_levels']
-  reference_pyramid= sample_dict['reference_pyramid']
-  test_pyramid = sample_dict['test_pyramid']
-  nChannel = sample_dict['nChannel']
-  
-  if not (0.0 < sampling <= 1.0) :
-    standard_log.error(f' the sampling ratio must be equal up to 1.0, so {sampling} will be set to 0.1 as default')
-    sampling = 0.1
-
-  reference_lst, test_lst, heights_lst, widths_lst, xy_lst, ind_lst=[],[],[],[],[],[] #one feature for each level of the pyramid
+    reference_lst, test_lst, heights_lst, widths_lst, xy_lst, ind_lst=[],[],[],[],[],[] #one feature for each level of the pyramid
 
 
-  for s in range(L): # for each level of resolution pyramids
-    ref_ = normalize_img(image=reference_pyramid[s], normalization_interval= (0,1),).to(device) # normalization for normalized coordinates
-    tst_ = normalize_img(image=test_pyramid[s], normalization_interval= (0,1),).to(device) # normalization for normalized coordinates
+    for s in range(L): # for each level of resolution pyramids
+        ref_ = normalize_img(image=reference_pyramid[s], normalization_interval= (0,1),).to(device) # normalization for normalized coordinates
+        tst_ = normalize_img(image=test_pyramid[s], normalization_interval= (0,1),).to(device) # normalization for normalized coordinates
 
-    if nChannel>1:
-        reference_lst.append(permute_channel_layout(image=ref_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
-        test_lst.append(permute_channel_layout(image=tst_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
-        height_, width_ = reference_lst[s].shape[1], reference_lst[s].shape[2]
-        ind_ = torch.randperm(int(height_*width_*sampling), device=device) # FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
-        ind_lst.append(ind_)
-    else:
-        reference_lst.append(ref_)
-        test_lst.append(tst_)
-        height_, width_ = reference_lst[s].shape[0], reference_lst[s].shape[1]
-        ind_ = torch.randperm(int(height_*width_*sampling), device=device)# FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
-        ind_lst.append(ind_)
-    heights_lst.append(height_)
-    widths_lst.append(width_)
+        if nChannel>1:
+            reference_lst.append(permute_channel_layout(image=ref_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
+            test_lst.append(permute_channel_layout(image=tst_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
+            height_, width_ = reference_lst[s].shape[1], reference_lst[s].shape[2]
+            ind_ = torch.randperm(int(height_*width_*sampling), device=device) # FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
+            ind_lst.append(ind_)
+        else:
+            reference_lst.append(ref_)
+            test_lst.append(tst_)
+            height_, width_ = reference_lst[s].shape[0], reference_lst[s].shape[1]
+            ind_ = torch.randperm(int(height_*width_*sampling), device=device)# FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
+            ind_lst.append(ind_)
+        heights_lst.append(height_)
+        widths_lst.append(width_)
 
-    y_, x_ = torch.meshgrid([torch.arange(0,height_).float().to(device), torch.arange(0,width_).float().to(device)], indexing='ij')
-    normalization_map = get_coords_normalization_map(height=height_, 
-                                                     width=width_, 
-                                                     data_type=torch.float32,
-                                                     device=device)
+        y_, x_ = torch.meshgrid([torch.arange(0,height_).float().to(device), torch.arange(0,width_).float().to(device)], indexing='ij')
+        normalization_map = get_coords_normalization_map(height=height_, 
+                                                        width=width_, 
+                                                        data_type=torch.float32,
+                                                        device=device)
 
-    stacked_coords = torch.stack([x_, y_, torch.ones_like(x_)]).reshape(3, -1)
-    stacked_norm_coords = torch.matmul(normalization_map, stacked_coords)
-    xy_ = stacked_norm_coords.reshape(3, height_, width_)[:2].permute(1,2,0)
-    xy_lst.append(xy_)
-  return {'reference_lst' : reference_lst,
-          'test_lst': test_lst,
-          'x_' : x_, # NOTE not a list
-          'y_': y_, # NOTE not a list
-          'xy_lst': xy_lst,
-          'ind_lst': ind_lst,
-          'heights_lst': heights_lst,
-          'widths_lst': widths_lst
-          }
+        stacked_coords = torch.stack([x_, y_, torch.ones_like(x_)]).reshape(3, -1)
+        stacked_norm_coords = torch.matmul(normalization_map, stacked_coords)
+        xy_ = stacked_norm_coords.reshape(3, height_, width_)[:2].permute(1,2,0)
+        xy_lst.append(xy_)
+    return {'reference_lst' : reference_lst,
+            'test_lst': test_lst,
+            'x_' : x_, # NOTE not a list
+            'y_': y_, # NOTE not a list
+            'xy_lst': xy_lst,
+            'ind_lst': ind_lst,
+            'heights_lst': heights_lst,
+            'widths_lst': widths_lst
+            }
 
 
 #                                              =====================
