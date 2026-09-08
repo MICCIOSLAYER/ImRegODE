@@ -31,7 +31,7 @@ import numpy as np
 
 
 standard_log = get_logger(__name__)
-
+_fwc_dict = FrameworkConfig()
 
 
 
@@ -925,8 +925,31 @@ def wrapper_drmine_registration_loop(
     return registration_dict
 
 
+#                                           ==========================
+#                                                RESULTS COLLECTOR
+#                                           ==========================
 
-#-------------------------------------------REGISTRATION FNS-------------------------------------------
+def results_collection(
+        dataloader : DataLoader,
+        registration_fn : Callable[[SampleDict, dict | FrameworkConfig ], dict], 
+        collector: Registration_Data_Collector,
+        preprocessing_fn :Callable = general_preprocessing,
+        config_dict : dict | FrameworkConfig = _fwc_dict,
+        )-> Registration_Data_Collector:
+    '''
+    foundamentally a wrapperon registration loop, to collect results althoghether
+
+    Args:
+        dataloader (DataLoader): the dataloader whose iterator is used to load data on registration loops
+        registration_fn (Callable[[SampleDict, dict | FrameworkConfig ], dict]): registration/wrapper to align images, it produce a dict
+        collector (Registration_Data_Collector): _description_
+        preprocessing_fn (Callable, optional): _description_. Defaults to general_preprocessing.
+        config_dict (dict | FrameworkConfig, optional): _description_. Defaults to _fwc_dict.
+
+    Returns:
+        Registration_Data_Collector: _description_
+    '''
+    pass
 
 
 
@@ -938,7 +961,18 @@ def wrapper_drmine_registration_loop(
 
 
 PreprocessingFn = Callable[[SampleDict | Sequence, dict], SampleDict]
+
 RegistrationFn = Callable[[SampleDict, dict], dict]
+
+DataCollectionFN = Callable[
+    [DataLoader, # dataloader
+     dict | FrameworkConfig, # config_dict
+     RegistrationFn, # registrations_fn
+     PreprocessingFn, # preprocessing_fn
+     Registration_Data_Collector # data_collector
+     ]
+
+]
 
 
 def run_registration_pipeline(dataset : Dataset,                              
@@ -991,7 +1025,7 @@ def run_registration_pipeline(dataset : Dataset,
     for sample in tqdm(islice(dataset_iterator, max_sample), total=max_sample, desc="Running Registration Pipeline"):
         
         preprocessed_sample = preprocessing_fn(sample, config_dict)
-        registration_results = registration_fn(preprocessed_sample)
+        registration_results = registration_fn(preprocessed_sample, config_dict)
 
         data_collector.add_registration_data(registration_results)
     
@@ -1004,7 +1038,66 @@ def run_registration_pipeline(dataset : Dataset,
         
         path_to_results = data_collector.save_data(filename='wrapper_trial', fmt=result_type, results_path=save_results_in) # FIXME use config_dict
 
-    
-    
-
     return (data_collector, path_to_results)
+
+
+
+
+
+
+def run_registration_pipeline(
+
+        registration_fn : Callable[[SampleDict, dict | FrameworkConfig ], dict], # to typize
+        dataset : Optional[Dataset] = None, #optional
+        dataloader : Optional[DataLoader] = None, # depending on the first
+        config_dict : dict | FrameworkConfig =_fwc_dict,
+        preprocessing_fn : Callable[[SampleDict, dict| FrameworkConfig], SampleDict] = general_preprocessing,
+        data_collection_fn : DataCollectionFN = results_collection,
+        save_results: bool = True
+        )->Tuple[Registration_Data_Collector, Optional[Path]]:
+    '''
+    run the registration defined pipeline by using key point in this parametrization
+
+    Args:
+        dataset (Dataset):  the Dataset of images it get a easy access to images as path like or PIL images
+        dataloader (DataLoader): dataloader starting from the dataset, previously cited
+        config_dict (dict or FrameworkConfig): the dict infos containing all tipe of informations, depending also on registration and preprocessing functions, 
+            otherwise only change the yaml file for configuration
+            for a dict type on this level it has to have the folowing keys : 'SAVING_FORMAT' , 'RESULTS'
+        preprocessing_fn (Callable[[SampleDict, dict], SampleDict]): preprocessing function, all from dataset/dataloader to input of registration_fn
+        registratoion_fn (Callable): registration/wrappper to get the results in dict form
+        data_collection_fn (Callable [dict, [Path, Registration_Data_Collector]]): the function to get results organized in Registration_Data_Collector
+        save_results (bool): whether to save the registration results
+
+    Returns:
+        [Registration_Data_Collector, Optional[Path]]: Registration_Data_Collector is a must, if save_results, also the saving_path is delivered
+    '''
+    if dataloader is None and dataset is None:
+        raise ValueError('one of the two must be defined, otherwise nothing to do')
+    elif dataloader is None:
+        dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+
+
+    data_collector = Registration_Data_Collector()
+
+    collected_results = data_collection_fn(
+        dataloader = dataloader,
+        config_dcit=config_dict,
+        registration_fn = registration_fn,
+        preprocessing_fn = preprocessing_fn,
+        collector = data_collector
+    )
+    saving_path = None
+    if save_results:
+
+        if isinstance(config_dict, dict): 
+            saving_format = config_dict['SAVING_FORMAT']
+            results_path = config_dict['RESULTS']
+                        
+        else:
+            saving_format = config_dict.text_dict['SAVING_FORMAT']
+            results_path = config_dict.path_dict['RESULTS']
+
+        saving_path = collected_results.save_data(filename=None, results_path=results_path, fmt = saving_format)
+
+    return (collected_results, saving_path)
