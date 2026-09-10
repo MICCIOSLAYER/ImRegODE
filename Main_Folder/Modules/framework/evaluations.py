@@ -53,6 +53,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
                         )-> float:
     '''
     wrapper for naed_evaluation function to adapt to drmine registration original
+    it handle the conversion of affine_matrix as homographynet in a cpu-tensor
 
     Args:
         sample_dict (SampleDict): dict of samples informations
@@ -72,7 +73,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
         affine_matrix = affine_matrix(0)
     image_shape = (sample_dict['extras']['crop_dict']['h_f'],sample_dict['extras']['crop_dict']['w_f'])
 
-    original_affine_matrix = decrop_matrix(H =unnormalize_matrix(H=affine_matrix,
+    original_affine_matrix = decrop_matrix(H =unnormalize_matrix(H=affine_matrix, # following the previous order on reverse normalization after crop -> decrop the unnormalized 
                                                                  image_shape=image_shape),
                                                                  offset_y0x0=sample_dict['extras']['crop_dict']['corner_coords'])
     
