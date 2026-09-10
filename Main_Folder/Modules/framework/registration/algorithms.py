@@ -13,7 +13,7 @@ from Main_Folder.Modules.framework.preprocessing import general_preprocessing, a
 from Main_Folder.Modules.framework.visualization import airlab_show_image_differencies
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
 from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk, airlab_read_image
-from Main_Folder.Modules.framework.evaluations import naed_evaluation
+from Main_Folder.Modules.framework.evaluations import naed_evaluation, update_with_evaluation
 import SimpleITK as sitk
 from airlab.utils.image import Image as AirlabImage
 from airlab.registration import PairwiseRegistration
@@ -935,6 +935,8 @@ def results_collection(
         collector: Registration_Data_Collector,
         preprocessing_fn :Callable = general_preprocessing,
         config_dict : dict | FrameworkConfig = _fwc_dict,
+        max_sample: Optional[int]= None,
+        registration_name : Optional[str]=None,
         )-> Registration_Data_Collector:
     '''
     foundamentally a wrapperon registration loop, to collect results althoghether
@@ -942,14 +944,40 @@ def results_collection(
     Args:
         dataloader (DataLoader): the dataloader whose iterator is used to load data on registration loops
         registration_fn (Callable[[SampleDict, dict | FrameworkConfig ], dict]): registration/wrapper to align images, it produce a dict
-        collector (Registration_Data_Collector): _description_
-        preprocessing_fn (Callable, optional): _description_. Defaults to general_preprocessing.
-        config_dict (dict | FrameworkConfig, optional): _description_. Defaults to _fwc_dict.
-
+        collector (Registration_Data_Collector): Data Collector to store informations in, it should be empty, but not a must
+        preprocessing_fn (Callable, optional): preprocessing of the registration. Defaults to general_preprocessing.
+        config_dict (dict | FrameworkConfig, optional): the framework dict of configuration as well as the main dict for wverything below. Defaults to _fwc_dict.
+        max_sample (int, optional): define the dimension of the dataset to analize. Default to None
+        registration_name (str, optional): the name whose collector will use for registration. None as Default
     Returns:
-        Registration_Data_Collector: _description_
+        Registration_Data_Collector: the updated collector with newfound datas of this registration_fn
     '''
-    pass
+    #1. dataloader iterator:
+    data_iterator = iter(dataloader)
+    registration_name = registration_name or registration_fn.__name__
+
+    if max_sample is not None and 0 < max_sample <= len(dataloader):
+        data_iterator = islice(iterable = data_iterator, stop = max_sample)
+    for sample_set in data_iterator:
+        preprocessed_sample_dict = preprocessing_fn(sample_dict=sample_set, config_dict=config_dict)
+        registration_results = registration_fn(preprocessed_sample_dict, config_dict=config_dict)
+
+        if not any('naed' in k.lower() for k in registration_results.keys()):
+            
+            registration_results=update_with_evaluation(sample_dict=preprocessed_sample_dict, # FIXME to complete with normalization_type, use of kwargs
+                                                        registration_results=registration_results,
+                                                        eval_fn=naed_evaluation,
+                                                        name_to_use='naed_evaluation')
+            
+        
+
+        collector.add_registration_data(image_pair_name=preprocessed_sample_dict['sample_name'],
+                                        registration_data = registration_results,
+                                        registration_name = registration_name
+                                        )    
+
+    return collector
+    
 
 
 
@@ -970,80 +998,9 @@ DataCollectionFN = Callable[
      RegistrationFn, # registrations_fn
      PreprocessingFn, # preprocessing_fn
      Registration_Data_Collector # data_collector
-     ]
+     ], Registration_Data_Collector
 
 ]
-
-
-def run_registration_pipeline(dataset : Dataset,                              
-                              registration_fn: RegistrationFn,
-                              config_dict : dict | FrameworkConfig,
-                              preprocessing_fn: Optional[PreprocessingFn] = general_preprocessing,
-                              saving_path: Path = None,
-                              
-                              )-> Tuple[Registration_Data_Collector, Optional[Path]]:
-    '''
-    It RUN a registration Pipeline to actually get the registration results to be put in the DataCollector created
-    the PIPELINE: get the dataset as first input:
-    DATASET ----> PREPROCESSING ---> REGISTRATION to get results
-
-    Args:
-        dataset (Dataset): the Dataset of images it get a easy access to images as path like or PIL images
-        registration_fn (RegistrationFn): main focus of the work, analyze, process, calculate informations about the image pair returning a defined formatted results
-            to be collected in the designated object
-        config_dict: the dict infos containing all tipe of informations, depending also on registration and preprocessing functions, 
-            otherwise only change the yaml file for configuration
-            for a dict type on this level it has to have the folowing keys : 'SAVING_FORMAT' , 'RESULTS', 'batch_size', 'max_sample'
-        preprocessing_fn (PreprocessingFn): adjust the images as requested for the Pipeline and the experiment
-
-        save_results (bool): whether to save the registration results
-        project_root (Path): the root path of the project to save results in the right folder, if used from script use Path(__file__) as start_path
-
-    Returns:
-        Registration_Data_collector: The collector of results
-    '''
-    # 0. PRESET ALL THE PARAMETERS OR CONSTANT FROM YAML OR MANUAL
-    
-    if isinstance(config_dict, dict):
-        registration_dict = config_dict
-        saving_format = config_dict['SAVING_FORMAT']
-        results_path = config_dict['RESULTS']
-        
-    else:
-        registration_dict = config_dict.num_dict
-        saving_format = config_dict.text_dict['SAVING_FORMAT']
-        results_path = config_dict.path_dict['RESULTS']
-
-    data_collector = Registration_Data_Collector()
-    
-    batch_size = registration_dict['batch_size'] 
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    dataset_iterator = iter(dataloader)
-    max_sample = registration_dict['max_sample'] 
-    
-    #1. DEFINE THE PIPELINE
-    for sample in tqdm(islice(dataset_iterator, max_sample), total=max_sample, desc="Running Registration Pipeline"):
-        
-        preprocessed_sample = preprocessing_fn(sample, config_dict)
-        registration_results = registration_fn(preprocessed_sample, config_dict)
-
-        data_collector.add_registration_data(registration_results)
-    
-    #2. SAVE RESULTS
-    if saving_path and saving_path.exists():
-        save_results_in = saving_path
-    else:
-        save_results_in = results_path
-        result_type = saving_format
-        
-        path_to_results = data_collector.save_data(filename='wrapper_trial', fmt=result_type, results_path=save_results_in) # FIXME use config_dict
-
-    return (data_collector, path_to_results)
-
-
-
-
-
 
 def run_registration_pipeline(
 
