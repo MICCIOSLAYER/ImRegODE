@@ -1,13 +1,14 @@
 # use for evaluate the efficiency of certain methods of registration: as NAED and similar
 # it contains also the utils for these methods
-from Main_Folder.Modules.framework.data_classes import SampleDict
-from Main_Folder.Modules.configuration_setting.yaml_configuration import  FrameworkConfig
+from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
+from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.framework.registration.networks  import HomographyNet
 from Main_Folder.Modules.framework.postprocessing import unnormalize_matrix, decrop_matrix
-from typing import Optional, Callable, Literal, Any, TYPE_CHECKING
+from typing import Optional, Callable, Literal, Any, Sequence, TYPE_CHECKING
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
+from scipy.stats import ttest_rel
 import numpy as np
 import torch
 from pathlib import Path
@@ -304,3 +305,61 @@ def normalized_cross_correlation(
     ncc = numerator / denominator
 
     return ncc
+
+
+#=======================================================================================================
+#                                           SSTATISTICS                                           
+#=======================================================================================================
+
+def get_statistics_val(ref_data_collector : Registration_Data_Collector,
+                       test_data_collector : Registration_Data_Collector,
+                       feature_to_analyse : Optional[Sequence[str]] = None
+                       )->dict[str, Any]:
+    '''
+    generate a dict containing statistic vals confronting the registration data collector of the methods.
+    It Performs as a wrapper between Registration_Data_Collector and statistics of scipy.statistics.ttest_rel
+
+    Args:
+        ref_data_collector (Registration_Data_Collector): the regiastration data collector whose distribution is the reference for the test one
+        test_data_collector (Registration_Data_Collector): the registration data collector to test on
+        feature_to_analyse(Sequence[str], optional): the list of columns to consider when calculating the statistics. default to None
+    Returns:
+        dict: return the results of statistics using a dict in the following format:
+        {   
+            feature{ 
+                difference_mean: ...,
+                std_mean: ...,
+                t_stat: ...,
+                p_val: ...,
+                cohen_dz: ...}},
+
+            feature2:{...}
+        }
+        
+    '''
+    statistics_dict = {} # NOTE none return
+    if feature_to_analyse is None:
+        standard_log.debug(f'since no features to compute skipped')
+        return statistics_dict
+    ref_df = ref_data_collector.get_dataframe
+    test_df = test_data_collector.get_dataframe
+    for feat in feature_to_analyse:
+        if feat not in ref_df.columns or feat not in test_df.columns:
+            standard_log.debug(f'since {feat} -feature not in both df it\'s skipped')
+            continue
+        statistics_dict[feat] ={}
+        idx_list = ref_df.index
+        ref_data = [ref_df.loc[idx, feat] for idx in idx_list]
+        test_data = [test_df.loc[idx, feat] for idx in idx_list]
+        feat_results = ttest_rel(a=ref_data,
+                                 b=test_data)
+        d_cohen = feat_results.statistic/np.sqrt(feat_results.df + 1)
+        statistics_dict[feat]= {
+            'p_val': feat_results.pvalue,
+            't_statistic' : feat_results.statistic,
+            'd_cohen': d_cohen
+        }
+        
+
+    standard_log.debug(f'the final stats contain these feat_stats: {statistics_dict.keys()}')
+    return statistics_dict
