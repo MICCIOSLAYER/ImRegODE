@@ -106,8 +106,9 @@ def get_root_path(
 
     Returns:
         Path: The path to the project directory.
-    '''
-
+        
+    '''    
+  
     if start_path is None:
         start_path = Path(__file__).resolve()
 
