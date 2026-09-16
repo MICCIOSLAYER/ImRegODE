@@ -478,10 +478,16 @@ class Registration_Data_Collector:
         except Exception as e:
             cls.logs.error(f'the {e} exception occurred')
             payload = {}
+        if isinstance(payload, cls):
+            print('loading the file using old configuration')
+            return payload
 
-        collector.registration_name = payload.get('registration_name', 'Unknown')
-        collector.notes = payload.get('notes', [])
-        collector.collection = payload.get('collection', {})
+        
+        elif(payload, dict):                
+            collector.registration_name = payload.get('registration_name', 'Unknown')
+            collector.notes = payload.get('notes', [])
+            collector.collection = payload.get('collection', {})
+        
 
 
         
