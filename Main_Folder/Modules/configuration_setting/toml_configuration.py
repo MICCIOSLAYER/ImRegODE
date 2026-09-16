@@ -73,6 +73,10 @@ def build_pyproject_from_requirements(
 
     E.G.:
     -----
+    local_req = PROJECT_PATH/ 'local-requirement.txt'
+    colab_req = PROJECT_PATH/ 'colab-requirements.txt'
+    tomlforuv= PROJECT_PATH/ 'tomlforuv.toml'
+    not_toml = False
     build_pyproject_from_requirements(local_req=local_req,
                                 colab_req=colab_req,
                                 output_pyproject= tomlforuv,
