@@ -16,10 +16,11 @@ from pathlib import Path
 
     
 standard_log = get_logger(__name__)
+_fwc_dict = FrameworkConfig()
 
 
 def get_coords(image_name : str | SampleDict , #es A01
-               ground_truth_path : Path = FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'], # in this case: control_points_[Image pair name]_1_2.txt
+               ground_truth_path : Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'], # in this case: control_points_[Image pair name]_1_2.txt
                )-> tuple[list[list[float]], list[list[float]]]:
     '''
     get the coordinates of control points associate to the image in list of coords format
@@ -35,7 +36,7 @@ def get_coords(image_name : str | SampleDict , #es A01
         name = image_name['sample_name']
         image_name = name
     if not ground_truth_path.exists():
-        raise FileNotFoundError(f'directory {ground_truth_path} not found')
+        raise FileNotFoundError(f'directory {ground_truth_path} not found') #NOTE use of a fallback and logs.error instead raise Err?
     txt_file_path = [n for n in list(ground_truth_path.glob('*')) if n.name.__contains__(image_name)]
     reference_points, test_points = [], []
     with open(txt_file_path[0], 'r') as file:
@@ -49,7 +50,7 @@ def get_coords(image_name : str | SampleDict , #es A01
 
 def wrapper_naed_drmine(sample_dict: SampleDict,
                         registration_dict : dict[str, Any],
-                        control_points_path: Path = FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'],
+                        control_points_path: Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'],
                         image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
                         )-> float:
     '''
@@ -59,7 +60,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
     Args:
         sample_dict (SampleDict): dict of samples informations
         registration_dict (dict[str, Any]): dict of registration containing registration results
-        control_points_path (Path, optional): view naed_evaluation. Defaults to FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'].
+        control_points_path (Path, optional): view naed_evaluation. Defaults to _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'].
         image_normalization (Literal[&#39;diagonal&#39; , &#39;coords_norm&#39;], optional): naed_evaluation. Defaults to 'coords_norm'.
 
     Returns:
@@ -80,6 +81,8 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
     
     evaluation = naed_evaluation(image_couple_name=image_couple_name,
                                  affine_matrix=original_affine_matrix,
+                                 control_points_path=control_points_path,
+                                 image_normalization=image_normalization
                                  )
     return evaluation
 
@@ -87,7 +90,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
 def naed_evaluation(image_couple_name: str,
                     affine_matrix: np.ndarray | torch.Tensor, 
                     image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
-                    control_points_path: Path = FrameworkConfig().path_dict['CONTROL_POINTS_FOLDER'],
+                    control_points_path: Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'],
                     image_dimensions: tuple | Path = (2912, 2912) ,
                     )-> float:
     '''
