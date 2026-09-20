@@ -3,7 +3,7 @@
 from typing import Sequence, Callable, Optional, Union, Any, Tuple
 from Main_Folder.Modules.framework.registration.methods import initialize_networks, initialize_optimizer
 import Main_Folder.Modules.framework.registration.networks 
-from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict
+from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict, has_required_keys
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
 from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
@@ -79,7 +79,7 @@ def sitk_wrapper_for_registration(sample_dict: SampleDict,
     if reference_sitk.GetSize() != test_sitk.GetSize():
             raise ValueError("The two images must have the same shape")
     
-    
+    #NOTE registration_data is not accessed
     
     sitk_transformation, registration_data, time_taken = sitk_registration_fn(reference_image = reference_sitk,
                                                                             test_image = test_sitk,
@@ -128,6 +128,10 @@ def MMI_SITK(reference_image: sitk.Image,
         If the dict, it has to have the following keys at least: 
         ['histo_bins', 'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
     
+    Required Keys 
+    ---------------
+    'sampling_ratio', 'histo_bins', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize'
+    
     Returns
     -------
     outTx : sitk.Transform
@@ -137,9 +141,13 @@ def MMI_SITK(reference_image: sitk.Image,
     registration_time_taken : float
         The time taken for the registration process.
     '''
-
+    required_keys =['sampling_ratio', 'histo_bins', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
     if isinstance(config_dict, dict):
-        mmi_sitk_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=required_keys):
+            mmi_sitk_dict = config_dict
+        else:
+            standard_log.warning('the config_dict miss some of required_keys, so the default is used, instead')
+            mmi_sitk_dict= _fwc_dict.registrations['simpleITK_original']['MMI']
     else:
         mmi_sitk_dict = config_dict.registrations['simpleITK_original']['MMI']
     
@@ -174,7 +182,7 @@ def MMI_SITK(reference_image: sitk.Image,
 
 def centred_NCC_SITK(reference_image: np.ndarray | torch.Tensor | Path,
                      test_image: np.ndarray | torch.Tensor | Path,
-                     config_dict:dict,)-> tuple: # NOTE see the output
+                     config_dict:dict|FrameworkConfig,)-> tuple: # NOTE see the output
     '''
     Mattes Mutual Information (MMI) between two images using SimpleITK.
     
@@ -185,13 +193,24 @@ def centred_NCC_SITK(reference_image: np.ndarray | torch.Tensor | Path,
     test_image : np.ndarray | torch.Tensor
         The warped image.
 
+    Required Keys 
+    ---------------
+    'lr','min_step', 'n_iterations', 'gradientMagnitudeTolerance'
     
     Returns
     -------
     float
         The Normalized Mutual Information value.
     '''
-    ncc_centred_dict = config_dict['registrations']['simpleITK_original']['NCC_centred']
+    required_keys= ['lr','min_step', 'n_iterations', 'gradientMagnitudeTolerance']
+    if isinstance(config_dict, dict):
+            if has_required_keys(input_dict=config_dict, required_keys=required_keys):
+                ncc_centred_dict = config_dict
+            else:
+                ncc_centred_dict=_fwc_dict.registrations['simpleITK_original']['NCC_centred']
+    else:
+        ncc_centred_dict = config_dict.registrations['simpleITK_original']['NCC_centred']
+    
     
     with block_time() as ncc_time:
         # to get the transformation of the matrix
@@ -221,7 +240,7 @@ def centred_NCC_SITK(reference_image: np.ndarray | torch.Tensor | Path,
 
 def JHMI_SITK(reference_image: sitk.Image,
               test_image: sitk.Image,
-              config_dict:dict,
+              config_dict:dict| FrameworkConfig,
               )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
     '''
     Mattes Mutual Information (MMI) between two images using SimpleITK.
@@ -239,12 +258,21 @@ def JHMI_SITK(reference_image: sitk.Image,
     float
         The Normalized Mutual Information value.
     '''
-
-
+    req_ks = ['sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize','histo_bins']
+    if isinstance(config_dict, dict) :
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            jhmi_sitk_dict = config_dict
+        else:
+            standard_log.warning('the config_dict miss some of required_keys, so the default is used, instead')
+            jhmi_sitk_dict= _fwc_dict.registrations['simpleITK_original']['JHMI']
+        
+    else:
+        jhmi_sitk_dict=config_dict.registrations['simpleITK_original']['JHMI']
     # normalization & Gaussian smoothing:
     #reference_image = sitk.DiscreteGaussian(sitk.Normalize(reference_image), 2.0) #removed since not present in the article
     #test_image = sitk.DiscreteGaussian(sitk.Normalize(test_image), 2.0) #removed since not present in the article
-    jhmi_sitk_dict= config_dict['registrations']['simpleITK_original']['JHMI']
+
+    
     samplingPercentage = jhmi_sitk_dict['sampling_ratio']
     lr = jhmi_sitk_dict['lr']
     n_iterations = jhmi_sitk_dict['n_iterations']
@@ -277,7 +305,7 @@ def JHMI_SITK(reference_image: sitk.Image,
 # Mean Squared Error:
 def MSE_SITK( reference_image: sitk.Image,
               test_image: sitk.Image,
-              config_dict : dict,
+              config_dict : dict |FrameworkConfig,
               )->tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
     '''
     Mean Squared Error (MMI) between two images using SimpleITK.
@@ -295,7 +323,16 @@ def MSE_SITK( reference_image: sitk.Image,
     float
         The Normalized Mutual Information value.
     '''
-    mse_sitk_dict = config_dict['registrations']['simpleITK_original']['MSE']
+    req_ks = ['sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
+    if isinstance(config_dict, dict) :
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            mse_sitk_dict = config_dict
+        else:
+            standard_log.warning('the config_dict miss some of required_keys, so the default is used, instead')
+            mse_sitk_dict= _fwc_dict.registrations['simpleITK_original']['MSE']
+    else:
+        mse_sitk_dict=config_dict.registrations['simpleITK_original']['MSE']
+    
     samplingPercentage = mse_sitk_dict['sampling_ratio']
     lr = mse_sitk_dict['lr']
     n_iterations = mse_sitk_dict['n_iterations']
@@ -327,7 +364,7 @@ def MSE_SITK( reference_image: sitk.Image,
 
 def NCC_SITK(reference_image: sitk.Image,
              test_image:  sitk.Image,
-             config_dict: dict,
+             config_dict: dict|FrameworkConfig,
            )-> tuple[Any, sitk.ImageRegistrationMethod, float]: # NOTE see the output
     '''
     Registration of two images using Normalized Cross Correlation (NCC) of SimpleITK as metric.
@@ -344,7 +381,17 @@ def NCC_SITK(reference_image: sitk.Image,
     float
         The normalized cross correlation value.
     '''
-    ncc_sitk_dict = config_dict['registrations']['simpleITK_original']['NCC']
+    req_ks = ['sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize']
+    if isinstance(config_dict, dict) :
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            ncc_sitk_dict = config_dict
+        else:
+            standard_log.warning('the config_dict miss some of required_keys, so the default is used, instead')
+            ncc_sitk_dict= _fwc_dict.registrations['simpleITK_original']['NCC']
+    else:
+        ncc_sitk_dict=config_dict.registrations['simpleITK_original']['NCC']
+    
+    
     samplingPercentage = ncc_sitk_dict['sampling_ratio']
     lr = ncc_sitk_dict['lr']
     n_iterations = ncc_sitk_dict['n_iterations']
@@ -482,9 +529,13 @@ def elastix_registration(reference_image: itk.Image,
     tuple
         The registered image and the registration parameters.
     '''
-    if isinstance(config_dict, dict):
-        elastix_config_dict = config_dict
-        # NOTE there are to be asserts to verify some keys
+    req_ks =['sampling_ratio', 'histo_bins', 'n_resolution','n_iterations']
+    if isinstance(config_dict, dict) :
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            elastix_config_dict = config_dict
+        else:
+            standard_log.warning('the config_dict miss some of required_keys, so the default is used, instead')
+            elastix_config_dict= _fwc_dict.registrations['simpleITK_original']['JHMI']
     else:
         elastix_config_dict = config_dict.registrations['elastix_original']
     
@@ -539,12 +590,18 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
             if a dict mandatory to have the following keys: 'masked' with a bool value
                                                             also see the registrationfn in the standard it has to have
         airlab_registration_fn (_type_): registration function following specs of airlab
-
+    Required Keys
+    ------------
+    'masked', if present it should contains parameter for the mask built
     Returns:
         dict: registration results of airlab_registration_fn
     '''
+    req_ks = ['masked']
     if isinstance(config_dict, dict):
-        airlab_config_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            airlab_config_dict = config_dict
+        else:
+            airlab_config_dict = _fwc_dict.registrations['airlab']
     else:
         airlab_config_dict= config_dict.registrations['airlab']
 
@@ -583,7 +640,7 @@ def airlab_wrapprer_for_registration(sample_dict:SampleDict,
             reference_image=airlab_reference_image,
             airlab_transformation=registration_data['airlab_transformation'],
             save_images = saving_path,
-            airlab_dict=airlab_config_dict,
+            airlab_dict=config_dict, #NOTE control why airlab_config_dcit instead of the config_dict
         )
 
 
@@ -641,6 +698,12 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     EarlyStopping: bool
         A flag to define how to stop the registration loop
 
+    Required Keys
+    ------------
+    'histo_bins', 'metric_sigma','sampling_ratio','lr','n_iterations', 
+    'early-stopping' if in use it has to have: {'patience':...,
+                                                'min_delta':...}
+    
     Returns
     -------
 
@@ -652,6 +715,14 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     #============DEVICE SELECTION============
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    req_keys=['histo_bins', 'metric_sigma','sampling_ratio','lr','n_iterations', 'early-stopping']
+    if isinstance(config_dict, dict):
+            if has_required_keys(input_dict=config_dict, required_keys=req_keys):
+                airlab_config_dict = config_dict
+            else:
+                airlab_config_dict = _fwc_dict.registrations['airlab']
+    else:
+        airlab_config_dict= config_dict.registrations['airlab']
     
     
 
@@ -800,7 +871,8 @@ def wrapper_drmine_registration_loop(
         parameter_for_registration (dict): parameter extracted by extract_registration_params, it has to have: 'reference_lst', 'test_lst', 'xy_lst', 'ind_lst'. Default to {}
         sample_dict (SampleDict): input point of data, complete and ordered in a typedDict datatype
         config_dict (dict): dictionary of configuration, if different from the yaml configuaration obj: it has to have the following keys:
-            'lr', 'n_iterations', 'sampling_ratio', 'patience', 'min_delta'; 'lr' has to be a dict with the following structure:{'MINE': 0.01, 'HomographyNet': {'vL': 0.001, 'v1': 1e-05}}
+            'lr', 'n_iterations', 'sampling_ratio', 'patience', 'min_delta'; 
+            'lr' has to be a dict with the following structure:{'MINE': 0.01, 'HomographyNet': {'vL': 0.001, 'v1': 1e-05}}
         drmine_registration_fn (Callable, optional): registration loop fn. Defaults to drmine_registration_loop.
         progression_bar (bool, optional): option to visualize the progression bar. Defaults to True.
         device (torch.device, optional): _description_. Defaults to torch.device('cuda' if torch.cuda.is_available() else 'cpu').
@@ -808,9 +880,12 @@ def wrapper_drmine_registration_loop(
     Returns:
         dict: dict of results from registration and some other measurments
     '''
-
+    req_ks = ['lr','n_iterations','sampling_ratio','patience','min_delta']
     if isinstance( config_dict, dict):
-        drmine_registration_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            drmine_registration_dict = config_dict
+        else: 
+            drmine_registration_dict=_fwc_dict.registrations['DRMINE_original']
     else:
         drmine_registration_dict = config_dict.registrations['DRMINE_original']
     
@@ -1046,11 +1121,13 @@ def run_registration_pipeline(
     )
     saving_path = None
     if save_results:
-
-        if isinstance(config_dict, dict): 
-            saving_format = config_dict['SAVING_FORMAT']
-            results_path = config_dict['RESULTS']
-                        
+        saving_ks = ['SAVING_FORMAT', 'RESULTS']
+        if isinstance(config_dict, dict):
+            if has_required_keys(input_dict=config_dict, required_keys=saving_ks):
+                saving_format = config_dict['SAVING_FORMAT']
+                results_path = config_dict['RESULTS']
+            else:
+                saving_format, results_path = _fwc_dict.text_dict['SAVING_FORMAT'], _fwc_dict.path_dict['RESULTS']           
         else:
             saving_format = config_dict.text_dict['SAVING_FORMAT']
             results_path = config_dict.path_dict['RESULTS']
