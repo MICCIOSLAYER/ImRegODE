@@ -97,7 +97,7 @@ constant:
     MOVING: _2
     REFERENCE_FOLDER: Reference
     TEST_FOLDER: Test
-    SAVING_FORMAT: csv
+    SAVING_FORMAT: pkl
     img_normalization: same
 registrations:
   DRMINE_original:
