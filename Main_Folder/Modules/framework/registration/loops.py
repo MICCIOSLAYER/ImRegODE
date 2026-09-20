@@ -1,6 +1,6 @@
 # all functions to be used inside the registration loop
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import  permute_channel_layout, tensor_img_rgb2bn, get_tensor, get_coords_normalization_map
+from Main_Folder.Modules.utils import  permute_channel_layout, tensor_img_rgb2bn, get_tensor, get_coords_normalization_map, has_required_keys
 from Main_Folder.Modules.framework.preprocessing import normalize_img
 from Main_Folder.Modules.framework.postprocessing import get_warped_coords
 from Main_Folder.Modules.framework.data_classes import SampleDict
@@ -13,6 +13,7 @@ import numpy as np
 from typing import Any, Tuple
 
 standard_log = get_logger(__name__)
+_fwc_dict = FrameworkConfig()
 
 def extract_registration_params(sample_dict : SampleDict,
                         config_dict: dict |FrameworkConfig,
@@ -28,6 +29,10 @@ def extract_registration_params(sample_dict : SampleDict,
     sample_dict (SampleDict): the dict containing all information about the sample useful for registration loop
     config_dict (dict): the dict representing the yaml configuration file
     device (torch.device): to put the tensor on the correct device during execution and calcula
+
+    Required Keys
+    ------------
+    'sampling_ratio', 'pyramid'; as for 'pyramid the 'gaussian_levels' key
 
     Returns
     -------
@@ -46,11 +51,14 @@ def extract_registration_params(sample_dict : SampleDict,
     
     # ======== GET VALS from CONFIG_DICT=============
 
-    
+    req_ks =['sampling_ratio', 'pyramid']
         
 
     if isinstance(config_dict, dict):
-        parameter_dict_configuration = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks) and has_required_keys(input_dict=config_dict['pyramid'], required_keys=['gaussian_levels']):
+            parameter_dict_configuration = config_dict
+        else: 
+            parameter_dict_configuration= _fwc_dict.registrations['DRMINE_original']
     else:
         parameter_dict_configuration = config_dict.registrations['DRMINE_original']
     
