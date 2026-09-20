@@ -252,7 +252,10 @@ def JHMI_SITK(reference_image: sitk.Image,
     test_image : np.ndarray | torch.Tensor
         The test image.
 
-    
+    Required Keys
+    ------------
+    'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize','histo_bins'
+        
     Returns
     -------
     float
@@ -317,6 +320,9 @@ def MSE_SITK( reference_image: sitk.Image,
     warped_image : np.ndarray | torch.Tensor
         The warped image.
 
+    Required Keys
+    ------------
+    'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize'
     
     Returns
     -------
@@ -375,7 +381,11 @@ def NCC_SITK(reference_image: sitk.Image,
         The fixed image.
     warped_image : np.ndarray | torch.Tensor
         The warped image.
-    
+
+    Required Keys
+    ------------
+    'sampling_ratio', 'lr', 'n_iterations', 'convergenceMinimumValue', 'convergenceWindowSize'
+
     Returns
     -------
     float
@@ -515,7 +525,7 @@ def elastix_registration(reference_image: itk.Image,
                        
                         )-> tuple:
     '''
-    _summary_
+    elastix registration for NMI metric algorithm
 
     Args
     -----
@@ -523,7 +533,11 @@ def elastix_registration(reference_image: itk.Image,
         test_image (itk.Image): itk image of test as deformed
         config_dict (dict | FrameworkConfig): configuration object:
             DICT -> mandatory keys: 'sampling_ratio', 'histo_bins', 'n_resolution', 'n_iterations'
-
+    
+    Required Keys
+    ------------
+    'sampling_ratio', 'histo_bins', 'n_resolution', 'n_iterations'
+    
     Returns
     -------
     tuple
@@ -1101,6 +1115,10 @@ def run_registration_pipeline(
         data_collection_fn (Callable [dict, [Path, Registration_Data_Collector]]): the function to get results organized in Registration_Data_Collector
         save_results (bool): whether to save the registration results
 
+    Required Keys
+    ------------
+    'SAVING_FORMAT', 'RESULTS'
+    
     Returns:
         [Registration_Data_Collector, Optional[Path]]: Registration_Data_Collector is a must, if save_results, also the saving_path is delivered
     '''
