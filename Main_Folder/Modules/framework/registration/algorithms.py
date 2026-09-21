@@ -1026,6 +1026,7 @@ def results_collection(
         config_dict : dict | FrameworkConfig = _fwc_dict,
         max_sample: Optional[int]= None,
         registration_name : Optional[str]=None,
+        **collection_kwargs,
         )-> Registration_Data_Collector:
     '''
     foundamentally a wrapperon registration loop, to collect results althoghether
@@ -1052,11 +1053,20 @@ def results_collection(
         registration_results = registration_fn(preprocessed_sample_dict, config_dict=config_dict)
 
         if not any('naed' in k.lower() for k in registration_results.keys()):
-            
+
+            coords_norm = {'image_normalization': 'naed_coords', 'name_to_use': 'naed_coords'}
             registration_results=update_with_evaluation(sample_dict=preprocessed_sample_dict, # FIXME to complete with normalization_type, use of kwargs
                                                         registration_results=registration_results,
                                                         eval_fn=naed_evaluation,
-                                                        name_to_use='naed_evaluation')
+                                                        **coords_norm,
+                                                        **collection_kwargs)
+            
+            diagonal_norm = {'image_normalization': 'naed_diagonal', 'name_to_use': 'naed_diagonal'}
+            registration_results=update_with_evaluation(sample_dict=preprocessed_sample_dict, # FIXME to complete with normalization_type, use of kwargs
+                                                                    registration_results=registration_results,
+                                                                    eval_fn=naed_evaluation,
+                                                                    **diagonal_norm,
+                                                                    **collection_kwargs)
             
         
 
@@ -1095,11 +1105,12 @@ def run_registration_pipeline(
 
         registration_fn : Callable[[SampleDict, dict | FrameworkConfig ], dict], # to typize
         dataset : Optional[Dataset] = None, #optional
-        dataloader : Optional[DataLoader] = None, # depending on the first
+        dataloader : Optional[DataLoader] = None, # depending on the previous
         config_dict : dict | FrameworkConfig =_fwc_dict,
         preprocessing_fn : Callable[[SampleDict, dict| FrameworkConfig], SampleDict] = general_preprocessing,
         data_collection_fn : DataCollectionFN = results_collection,
-        save_results: bool = True
+        save_results: bool = True,
+        **pipeline_kwargs
         )->Tuple[Registration_Data_Collector, Optional[Path]]:
     '''
     run the registration defined pipeline by using key point in this parametrization
@@ -1135,7 +1146,8 @@ def run_registration_pipeline(
         config_dcit=config_dict,
         registration_fn = registration_fn,
         preprocessing_fn = preprocessing_fn,
-        collector = data_collector
+        collector = data_collector,
+        **pipeline_kwargs
     )
     saving_path = None
     if save_results:
