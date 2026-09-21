@@ -13,7 +13,7 @@ from Main_Folder.Modules.framework.preprocessing import general_preprocessing, a
 from Main_Folder.Modules.framework.visualization import airlab_show_image_differencies
 from Main_Folder.Modules.configuration_setting.logger_configuration import  get_logger
 from Main_Folder.Modules.framework.img_io  import tensor_img_to_sitk, airlab_read_image
-from Main_Folder.Modules.framework.evaluations import naed_evaluation, update_with_evaluation
+from Main_Folder.Modules.framework.evaluations import naed_evaluation, update_with_evaluation, wrapper_naed_drmine
 import SimpleITK as sitk
 from airlab.utils.image import Image as AirlabImage
 from airlab.registration import PairwiseRegistration
@@ -1048,23 +1048,23 @@ def results_collection(
 
     if max_sample is not None and 0 < max_sample <= len(dataloader):
         data_iterator = islice(data_iterator, max_sample)
-    for sample_set in data_iterator:
+    for sample_set in tqdm(data_iterator, desc='REGISTRATION IN WORK'):
         preprocessed_sample_dict = preprocessing_fn(sample_dict=sample_set, config_dict=config_dict)
         registration_results = registration_fn(preprocessed_sample_dict, config_dict=config_dict)
 
         if not any('naed' in k.lower() for k in registration_results.keys()):
 
-            coords_norm = {'image_normalization': 'naed_coords', 'name_to_use': 'naed_coords'}
+            coords_norm = {'image_normalization': 'coords_norm', 'name_to_use': 'naed_coords'}
             registration_results=update_with_evaluation(sample_dict=preprocessed_sample_dict, # FIXME to complete with normalization_type, use of kwargs
                                                         registration_results=registration_results,
-                                                        eval_fn=naed_evaluation,
+                                                        eval_fn=wrapper_naed_drmine,
                                                         **coords_norm,
                                                         **collection_kwargs)
             
-            diagonal_norm = {'image_normalization': 'naed_diagonal', 'name_to_use': 'naed_diagonal'}
+            diagonal_norm = {'image_normalization': 'diagonal', 'name_to_use': 'naed_diagonal'}
             registration_results=update_with_evaluation(sample_dict=preprocessed_sample_dict, # FIXME to complete with normalization_type, use of kwargs
                                                                     registration_results=registration_results,
-                                                                    eval_fn=naed_evaluation,
+                                                                    eval_fn=wrapper_naed_drmine,
                                                                     **diagonal_norm,
                                                                     **collection_kwargs)
             
@@ -1143,7 +1143,7 @@ def run_registration_pipeline(
 
     collected_results = data_collection_fn(
         dataloader = dataloader,
-        config_dcit=config_dict,
+        config_dict=config_dict,
         registration_fn = registration_fn,
         preprocessing_fn = preprocessing_fn,
         collector = data_collector,
