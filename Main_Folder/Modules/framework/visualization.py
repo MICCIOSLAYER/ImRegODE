@@ -15,10 +15,11 @@ from typing import Union, Optional, Sequence, Any
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.preprocessing import rescaling_image
-from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths, image_to_numpy
+from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths, image_to_numpy, has_required_keys
 
 Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.ndarray]
 
+_fwc_dict = FrameworkConfig()
 standard_log = get_logger(__name__)
 
 
@@ -183,7 +184,7 @@ def elastix_show_difference_image(reference_image: itk.Image,
 def airlab_show_image_differencies(reference_image: AirlabImage,
                                    test_image: AirlabImage,
                                    airlab_transformation: Union[torch.nn.Module, Any],
-                                   config_dict : dict | FrameworkConfig,
+                                   config_dict : dict | FrameworkConfig=_fwc_dict,
                                    save_images: Union[Path, bool] = False,
                                    
                                    )->Optional[Path]:
@@ -195,16 +196,20 @@ def airlab_show_image_differencies(reference_image: AirlabImage,
         test_image (AirlabImage): the deformed image, to be registred or to be warped
         airlab_transformation (Union[nn.Module, Any]): basically the warping transformation obatined by the registration
         save_images (Union[bool, Path]): Define if save it or not in a specified path otherwise it will be placed in ImRes folder inside repos. Defaults to False.
-        config_dict: dict | FrameworkConfig: the space in which there are the information on metric sigma, n_histo_bin, n_iteration, lr
+        config_dict: dict | FrameworkConfig: the space in which there are the information on metric sigma, n_histo_bin, n_iteration, lr. Default to _fwc_dict
 
     Returns:
         Optional[Path]: the path of the saved image if save_images is True, otherwise None
     '''
+    req_ks = ['save_path', 'metric_sigma', 'histo_bins', 'n_iterations', 'lr']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     IN_COLAB = 'google.colab' in sys.module
     if isinstance(config_dict, dict):
-        airlab_dict=config_dict
-        imagedir_save_path = config_dict.get('save_path', save_images)
+        if has_required_keys(input_dict=config_dict, required_keys = req_ks):
+            airlab_dict=config_dict
+            imagedir_save_path = config_dict.get('save_path', save_images)
+        else:
+            airlab_dict, imagedir_save_path= _fwc_dict.registrations['airlab'], _fwc_dict.path_dict['IMG_RESULTS']
     else:
         airlab_dict= config_dict.registrations['airlab']
         imagedir_save_path = config_dict.path_dict['IMG_RESULTS']
