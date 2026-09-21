@@ -52,6 +52,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
                         registration_dict : dict[str, Any],
                         control_points_path: Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'],
                         image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
+                        **wrapper_kwargs,
                         )-> float:
     '''
     wrapper for naed_evaluation function to adapt to drmine registration original
@@ -62,7 +63,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
         registration_dict (dict[str, Any]): dict of registration containing registration results, expecially the affine_matrix
         control_points_path (Path, optional): view naed_evaluation. Defaults to _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'].
         image_normalization (Literal[&#39;diagonal&#39; , &#39;coords_norm&#39;], optional): naed_evaluation. Defaults to 'coords_norm'.
-
+        **wrapper_kwargs: kwargs optional to get not default params for naed_evaluation_configuration
     Returns:
         float: naed_evaluation
     '''
@@ -79,6 +80,8 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
                                                                  image_shape=image_shape),
                                                                  offset_y0x0=sample_dict['extras']['crop_dict']['corner_coords'])
     
+    
+
     evaluation = naed_evaluation(image_couple_name=image_couple_name,
                                  affine_matrix=original_affine_matrix,
                                  control_points_path=control_points_path,
@@ -166,7 +169,8 @@ def naed_evaluation(image_couple_name: str,
 def update_with_evaluation(sample_dict: SampleDict,
                            registration_results : dict[str, Any],
                            eval_fn : Callable[[SampleDict, dict[str,Any]],float],
-                           name_to_use : str = None
+                           name_to_use : str = None,
+                           **evaluation_kwargs
                            ) -> dict[str, Any]:
     '''
     easy update for registration dict using naed and registration results
@@ -179,7 +183,7 @@ def update_with_evaluation(sample_dict: SampleDict,
     Returns:
         dict[str, Any]: the registration_results dict updated with the eval function value
     '''
-    evaluation = eval_fn(sample_dict, registration_results)
+    evaluation = eval_fn(sample_dict, registration_results, **evaluation_kwargs)
     key_name = name_to_use or eval_fn.__name__
     registration_results[key_name] = evaluation
     return registration_results
