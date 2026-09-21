@@ -5,7 +5,7 @@ from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.utils import image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import get_tensor, image_to_numpy
+from Main_Folder.Modules.utils import get_tensor, image_to_numpy, has_required_keys
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
 import SimpleITK as sitk
@@ -28,14 +28,14 @@ image_type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
 
 
 standard_log = get_logger(__name__)
-_default_framework_cfg = FrameworkConfig().config_dict
+_fwc_dict = FrameworkConfig()
 
 
 #------------
 #LIST OF PREPROCESSING
 #-----------------
 def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
-                       config_dict: dict=_default_framework_cfg,
+                       config_dict: dict | FrameworkConfig = _fwc_dict,
                        transformations : Optional[Tuple[Callable[[SampleDict, dict], SampleDict], ...]] = None,
                        )-> SampleDict:
     '''
@@ -91,7 +91,7 @@ def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
 
 
 def sitk_preprocessing(sample_dict : SampleDict, 
-                       config_dict: dict = _default_framework_cfg
+                       config_dict: dict | FrameworkConfig = _fwc_dict
                        )-> dict:
     '''
     A preprocessing function to adjust the images for the registration pipeline using SimpleITK. It takes a sample dictionary and a configuration dictionary as input and returns a preprocessed sample dictionary.
@@ -116,7 +116,7 @@ def sitk_preprocessing(sample_dict : SampleDict,
 
 
 def airlab_preprocessing(sample_dict : SampleDict, 
-                       config_dict: dict = _default_framework_cfg
+                       config_dict: dict | FrameworkConfig = _fwc_dict
                        )-> dict:
     '''
     A preprocessing function to adjust the images for the registration pipeline using Airlab. It takes a sample dictionary and a configuration dictionary as input and returns a preprocessed sample dictionary.
@@ -141,7 +141,7 @@ def airlab_preprocessing(sample_dict : SampleDict,
 
 
 def drmine_preprocessing(sample_dict : SampleDict, 
-                       config_dict: dict | FrameworkConfig = _default_framework_cfg, # FIXME registrations.drmine
+                       config_dict: dict | FrameworkConfig = _fwc_dict,
                        )-> dict:
     '''
     A preprocessing function to adjust the images for the registration pipeline using DeepReg. It takes a sample dictionary and a configuration dictionary as input and returns a preprocessed sample dictionary.
@@ -160,12 +160,12 @@ def drmine_preprocessing(sample_dict : SampleDict,
                                                 transformations=transformations)
     crop_dimension = {'final_height' : 1941, 'final_width' : 1941}
     crop_dict, cropped_reference = crop_image_advance(original_image = preprocessed_sample['reference_sample'],
-                                                      config_dict=crop_dimension,
+                                                      config_dict=crop_dimension, # NOTE FIXME ?
                                                       centred=False,
                                                       new_O_O=[485,485],
                                                       )
     _, cropped_test = crop_image_advance(original_image = preprocessed_sample['test_sample'],
-                                                      config_dict=crop_dimension,
+                                                      config_dict=crop_dimension, # NOTE FIXME ?
                                                       centred=False,
                                                       new_O_O=[485,485],
                                                       )
@@ -180,7 +180,7 @@ def drmine_preprocessing(sample_dict : SampleDict,
 
 
 def elastix_preprocessing(sample_dict : SampleDict, 
-                       config_dict: dict = _default_framework_cfg
+                       config_dict: dict | FrameworkConfig = _fwc_dict
                        )-> dict:
     '''
     A preprocessing function to adjust the images for the registration pipeline using Elastix. It takes a sample dictionary and a configuration dictionary as input and returns a preprocessed sample dictionary.
@@ -204,8 +204,7 @@ def elastix_preprocessing(sample_dict : SampleDict,
 #==================
 def crop_images(moving_image : Path | torch.Tensor,
                 fixed_image : Path | torch.Tensor,
-                config_dict : dict | FrameworkConfig,
-                
+                config_dict : dict | FrameworkConfig = _fwc_dict,                
                 )-> Tuple[torch.Tensor, torch.Tensor]:
     '''
     given the images it crop to the desired size 
@@ -229,11 +228,13 @@ def crop_images(moving_image : Path | torch.Tensor,
     #open the images depending on the type
     move_image= image_to_numpy(moving_image)
     fix_image = image_to_numpy(fixed_image)
-    if isinstance(config_dict, dict):
+
+    if isinstance(config_dict, dict): # no need of has_required_keys
         LOWEDGE_BOX, HIGHEDGE_BOX = config_dict.get('LOWEDGE_BOX', float(Fraction(1.5/9))), config_dict.get('HIGHEDGE_BOX', float(Fraction(7.5/9)))
     else:
         num_dict = config_dict.num_dict
         LOWEDGE_BOX, HIGHEDGE_BOX = num_dict['LOWEDGE_BOX'], num_dict['HIGHEDGE_BOX']
+
     cropped_moving_image = torch.from_numpy(move_image[int(move_image.shape[0]*LOWEDGE_BOX):int(move_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*move_image.shape[1]):int(HIGHEDGE_BOX*move_image.shape[1]), :])
     cropped_fixed_image = torch.from_numpy(fix_image[int(LOWEDGE_BOX*fix_image.shape[0]):int(fix_image.shape[0]*HIGHEDGE_BOX), int(LOWEDGE_BOX*fix_image.shape[1]):int(HIGHEDGE_BOX*fix_image.shape[1]), :])
 
@@ -248,7 +249,7 @@ def crop_images(moving_image : Path | torch.Tensor,
 
 def crop_image_advance(
         original_image: torch.Tensor | np.ndarray,
-        config_dict : dict | FrameworkConfig, # FIXME change in crop_dict
+        config_dict : dict | FrameworkConfig= _fwc_dict, 
         crop_mode: Optional[Literal['area_proportion', 'area_ratio','keep_props']] = None,
         
         new_O_O : Optional[Sequence[int]]= None,
@@ -273,6 +274,9 @@ def crop_image_advance(
         
         config_dict(dict): the dict from which get crop infos on final dimensions, if a dict it has to have 'final_height' and 'final_width' as mandatory keys
 
+    Required Keys:
+        'final_height', 'final_width', 'area_ratio'
+
     Returns:
     Tuple of a cropped dict and a cropped image as a tensor of 
     A crop_dict={'h_f': final_height,
@@ -288,10 +292,13 @@ def crop_image_advance(
             
     A cropped_image (np.ndarray): the cropped image as a tensor of shape (1, C, h1, w1)
     '''
-    
+    crop_ks=['final_height', 'final_width', 'area_ratio']
     # define dict for crop, depending on type
     if isinstance(config_dict, dict):
-        crop_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=crop_ks):
+            crop_dict = config_dict
+        else:
+            crop_dict=_fwc_dict.num_dict['crop_dict']
     else:
         crop_dict = config_dict.num_dict['crop_dict']
     
@@ -447,7 +454,7 @@ def rescaling_image(img:itk.Image):
 
 
 def coupled_gaussian_pyramid(sample_dict: SampleDict,
-                             config_dict : dict | FrameworkConfig,
+                             config_dict : dict | FrameworkConfig = _fwc_dict,
                              )-> SampleDict:
     '''
     it takes two images to performa gaussian filter in 6 progressive steps
@@ -456,16 +463,24 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
     sample_dict (SampleDict): the dict with sample's  data 
     config_dict (dict | FrameworkConfig): the config with configuration parameters: if a dict it must have the keys (gaussian_downscale, gaussian_sigma)
 
+    Required Keys
+    ------------
+
+
     Returns
     -------
     SampleDict: updated sample dict with the pyramids of images for both test and reference images
 
     '''   
-    
+    req_ks =['gaussian_downscale', 'gaussian_sigma']
     fixed_image = sample_dict['reference_sample']
     moving_image = sample_dict['test_sample']
+
     if isinstance(config_dict, dict):
-        drmine_pyramid_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            drmine_pyramid_dict = config_dict
+        else:
+            drmine_pyramid_dict = _fwc_dict.registrations['DRMINE_original']['pyramid']
     else:
         drmine_pyramid_dict = config_dict.registrations['DRMINE_original']['pyramid']
     
@@ -571,7 +586,7 @@ def airlab_mask_from_image(img_airlab:AirlabImage,
 
 def airlab_mask_configuration(reference_image_airlab: AirlabImage,
             test_image_airlab: AirlabImage,
-            config_dict: dict| FrameworkConfig,
+            config_dict: dict| FrameworkConfig = _fwc_dict,
             
             )->Tuple[AirlabImage, AirlabImage]:
     '''
@@ -581,15 +596,20 @@ def airlab_mask_configuration(reference_image_airlab: AirlabImage,
     Args:
         reference_image_airlab (AirlabImage): The reference image.
         test_image_airlab (AirlabImage): The test image.
-        config_dict (dict | FrameworkConfig): A dictionary containing configuration parameters for preprocessing.
+        config_dict (dict | FrameworkConfig): A dictionary containing configuration parameters for preprocessing. Default to _fwc
             if dict, mandatory to have thefollowing keys: 'background_min', 'background_max'
 
     Returns:
         tuple[AirlabImage, AirlabImage]: The masked reference and test images.
     '''
+    req_ks = ['background_min','background_max']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     if isinstance(config_dict, dict):
-        airlab_config_dict = config_dict
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            airlab_config_dict = config_dict
+        else: 
+            airlab_config_dict = _fwc_dict.registrations['airlab']
     else:
         airlab_config_dict = config_dict.registrations['airlab']
     
