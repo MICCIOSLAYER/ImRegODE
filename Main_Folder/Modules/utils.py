@@ -109,7 +109,7 @@ def get_root_path(
         
     '''    
     if 'google.colab' in sys.modules:
-        return Path('/content') / {project_name}
+        return Path('/content') / project_name
   
     if start_path is None:
         start_path = Path(__file__).resolve()
