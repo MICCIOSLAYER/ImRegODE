@@ -236,6 +236,7 @@ class Registration_Data_Collector:
         self.collection = {}
         self.notes= [] # NOTE attribute to add notes on the collector
         self.logs =  get_logger(f'{type(self).__module__}.{type(self).__name__}')
+        self.registration_name= f'registration_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
     def add_registration_data(self,
                               image_pair_name: str, 
@@ -272,10 +273,9 @@ class Registration_Data_Collector:
                     continue
             self.collection[image_pair_name][key] = value # NOTE si può mettere in un finally?
         
-        if registration_name:
+        if registration_name is not None:
             self.registration_name = registration_name
-        else:
-            self.registration_name= f'registration_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            
 
     # ----------------------------- USEFUL METHODS-------------------------------------
 
