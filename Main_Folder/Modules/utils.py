@@ -1,6 +1,6 @@
 # FIle containing function f trasversal utility
 
-import os
+import os, sys
 from pathlib import Path
 import numpy as np
 #import yaml
@@ -108,6 +108,8 @@ def get_root_path(
         Path: The path to the project directory.
         
     '''    
+    if 'google.colab' in sys.modules:
+        return Path('/content') / {project_name}
   
     if start_path is None:
         start_path = Path(__file__).resolve()
