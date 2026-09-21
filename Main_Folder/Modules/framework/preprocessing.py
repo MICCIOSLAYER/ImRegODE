@@ -160,12 +160,12 @@ def drmine_preprocessing(sample_dict : SampleDict,
                                                 transformations=transformations)
     crop_dimension = {'final_height' : 1941, 'final_width' : 1941}
     crop_dict, cropped_reference = crop_image_advance(original_image = preprocessed_sample['reference_sample'],
-                                                      config_dict=crop_dimension, # NOTE FIXME ?
+                                                      crop_info=crop_dimension, # NOTE FIXME ?
                                                       centred=False,
                                                       new_O_O=[485,485],
                                                       )
     _, cropped_test = crop_image_advance(original_image = preprocessed_sample['test_sample'],
-                                                      config_dict=crop_dimension, # NOTE FIXME ?
+                                                      crop_info=crop_dimension, # NOTE FIXME ?
                                                       centred=False,
                                                       new_O_O=[485,485],
                                                       )
@@ -249,7 +249,7 @@ def crop_images(moving_image : Path | torch.Tensor,
 
 def crop_image_advance(
         original_image: torch.Tensor | np.ndarray,
-        config_dict : dict | FrameworkConfig= _fwc_dict, 
+        crop_info : dict | FrameworkConfig= _fwc_dict, 
         crop_mode: Optional[Literal['area_proportion', 'area_ratio','keep_props']] = None,
         
         new_O_O : Optional[Sequence[int]]= None,
@@ -294,13 +294,13 @@ def crop_image_advance(
     '''
     crop_ks=['final_height', 'final_width', 'area_ratio']
     # define dict for crop, depending on type
-    if isinstance(config_dict, dict):
-        if has_required_keys(input_dict=config_dict, required_keys=crop_ks):
-            crop_dict = config_dict
+    if isinstance(crop_info, dict):
+        if has_required_keys(input_dict=crop_info, required_keys=crop_ks):
+            crop_dict = crop_info
         else:
             crop_dict=_fwc_dict.num_dict['crop_dict']
     else:
-        crop_dict = config_dict.num_dict['crop_dict']
+        crop_dict = crop_info.num_dict['crop_dict']
     
     final_height = crop_dict['final_height']
     final_width = crop_dict['final_width']
@@ -604,7 +604,7 @@ def airlab_mask_configuration(reference_image_airlab: AirlabImage,
     '''
     req_ks = ['background_min','background_max']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     if isinstance(config_dict, dict):
         if has_required_keys(input_dict=config_dict, required_keys=req_ks):
             airlab_config_dict = config_dict
