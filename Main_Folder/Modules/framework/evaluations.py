@@ -59,7 +59,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
 
     Args:
         sample_dict (SampleDict): dict of samples informations
-        registration_dict (dict[str, Any]): dict of registration containing registration results
+        registration_dict (dict[str, Any]): dict of registration containing registration results, expecially the affine_matrix
         control_points_path (Path, optional): view naed_evaluation. Defaults to _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'].
         image_normalization (Literal[&#39;diagonal&#39; , &#39;coords_norm&#39;], optional): naed_evaluation. Defaults to 'coords_norm'.
 
