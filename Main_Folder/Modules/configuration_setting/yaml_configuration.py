@@ -168,6 +168,7 @@ class FrameworkConfig:
 
     @property
     def path_dict(self):
+        #aggiungi la versione colab da qui
         return self._config_dict['constant']['path-like']
 
 

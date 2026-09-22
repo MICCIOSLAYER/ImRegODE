@@ -12,15 +12,18 @@ from scipy.stats import ttest_rel
 import numpy as np
 import torch
 from pathlib import Path
+import sys
 
 
     
 standard_log = get_logger(__name__)
 _fwc_dict = FrameworkConfig()
+_fire_dataset = _fwc_dict.path_dict['DRIVE_FIRE'] if 'google.colab' in sys.modules else _fwc_dict.path_dict['FIRE_DATASET']
+_control_points_folder = _fire_dataset / 'Ground Truth'
 
 
 def get_coords(image_name : str | SampleDict , #es A01
-               ground_truth_path : Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'], # in this case: control_points_[Image pair name]_1_2.txt
+               ground_truth_path : Path = _control_points_folder, # in this case: control_points_[Image pair name]_1_2.txt
                )-> tuple[list[list[float]], list[list[float]]]:
     '''
     get the coordinates of control points associate to the image in list of coords format
@@ -50,7 +53,7 @@ def get_coords(image_name : str | SampleDict , #es A01
 
 def wrapper_naed_drmine(sample_dict: SampleDict,
                         registration_dict : dict[str, Any],
-                        control_points_path: Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'],
+                        control_points_path: Path = _control_points_folder,
                         image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
                         **wrapper_kwargs,
                         )-> float:
@@ -61,7 +64,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
     Args:
         sample_dict (SampleDict): dict of samples informations
         registration_dict (dict[str, Any]): dict of registration containing registration results, expecially the affine_matrix
-        control_points_path (Path, optional): view naed_evaluation. Defaults to _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'].
+        control_points_path (Path, optional): view naed_evaluation. Defaults to _control_points_folder.
         image_normalization (Literal[&#39;diagonal&#39; , &#39;coords_norm&#39;], optional): naed_evaluation. Defaults to 'coords_norm'.
         **wrapper_kwargs: kwargs optional to get not default params for naed_evaluation_configuration
     Returns:
@@ -93,7 +96,7 @@ def wrapper_naed_drmine(sample_dict: SampleDict,
 def naed_evaluation(image_couple_name: str,
                     affine_matrix: np.ndarray | torch.Tensor, 
                     image_normalization :  Literal['diagonal' , 'coords_norm'] = 'coords_norm',
-                    control_points_path: Path = _fwc_dict.path_dict['CONTROL_POINTS_FOLDER'],
+                    control_points_path: Path = _control_points_folder,
                     image_dimensions: tuple | Path = (2912, 2912) ,
                     )-> float:
     '''
