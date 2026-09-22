@@ -1050,7 +1050,7 @@ def results_collection(
 
     if max_sample is not None and 0 < max_sample <= len(dataloader):
         data_iterator = islice(data_iterator, max_sample)
-    for sample_set in tqdm(data_iterator, desc='REGISTRATION IN WORK'):
+    for sample_set in tqdm(data_iterator,total=max_sample, desc='REGISTRATION IN WORK'):
         preprocessed_sample_dict = preprocessing_fn(sample_dict=sample_set, config_dict=config_dict)
         registration_results = registration_fn(preprocessed_sample_dict, config_dict=config_dict)
 
