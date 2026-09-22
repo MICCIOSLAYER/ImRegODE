@@ -89,6 +89,16 @@ constant:
     RESULTS:
     - Main_Folder
     - Results
+    DRIVE_RESULTS:
+    - /content
+    - drive
+    - MyDrive
+    - Results
+    DRIVE_FIRE:
+    - /content
+    - drive
+    - MyDrive
+    - FIRE
   text-like:
     A_FOLDER: Longitudinal_Studies
     S_FOLDER: Super_Resolution

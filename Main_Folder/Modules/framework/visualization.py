@@ -21,6 +21,7 @@ Image_Type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage, Path, np.nd
 
 _fwc_dict = FrameworkConfig()
 standard_log = get_logger(__name__)
+_default_save_dir = _fwc_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else _fwc_dict.path_dict['RESULTS'] 
 
 
     
@@ -168,7 +169,7 @@ def elastix_show_difference_image(reference_image: itk.Image,
     if saving_path.exists():
         imagedir_save_path = saving_path
     elif not saving_path.exists() and not saving_path is None:
-        imagedir_save_path = FrameworkConfig().path_dict['IMG_RESULTS']
+        imagedir_save_path = _default_save_dir /'ImgRes'
         standard_log.warning(f'since the chosen {saving_path} do not corresponds to any of existent path the default one in yaml configuration is used')
     else:
         return None
@@ -209,16 +210,16 @@ def airlab_show_image_differencies(reference_image: AirlabImage,
             airlab_dict=config_dict
             imagedir_save_path = config_dict.get('save_path', save_images)
         else:
-            airlab_dict, imagedir_save_path= _fwc_dict.registrations['airlab'], _fwc_dict.path_dict['IMG_RESULTS']
+            airlab_dict, imagedir_save_path= _fwc_dict.registrations['airlab'], _default_save_dir /'ImgRes'
     else:
         airlab_dict= config_dict.registrations['airlab']
-        imagedir_save_path = config_dict.path_dict['IMG_RESULTS']
+        imagedir_save_path = _default_save_dir / 'ImgRes'
 
     metric_sigma = airlab_dict['metric_sigma']
     metric_num_bins = airlab_dict['histo_bins']
     num_iterations= airlab_dict['n_iterations']
     learning_rate= airlab_dict['lr']
-    PROJECT_PATH = get_root_path()
+    #PROJECT_PATH = get_root_path()
 
     
 

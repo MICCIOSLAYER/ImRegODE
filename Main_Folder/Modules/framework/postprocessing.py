@@ -11,7 +11,8 @@ from Main_Folder.Modules.framework.registration.networks  import HomographyNet
 from Main_Folder.Modules.framework.img_io import tensor_img_to_sitk
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 
-
+_fwc_dict= FrameworkConfig()
+_default_save_dir = _fwc_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else _fwc_dict.path_dict['RESULTS'] 
 
 #                                   ==============================
 #                                    AFFINE/HOMO MATRIX OPERATIONS
@@ -114,7 +115,7 @@ def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME t
                    interpolator = sitk.sitkLinear,
                    default_pxv : int = 100,
                    save_image: bool = False,
-                   folder_path: Path = FrameworkConfig().path_dict['IMG_RESULTS'], 
+                   folder_path: Path = _default_save_dir / 'ImgRes', 
                    name: str = 'image_sitk'                  
                    )-> sitk.Image:
     '''
@@ -127,7 +128,7 @@ def get_image_confrontation_SITK(image_ref : sitk.Image | torch.Tensor, #FIXME t
         interpolator (_type_, optional): interpolator to pass from discrete to conituous data. Defaults to sitk.sitkLinear.
         default_pxv (int, optional): Default pixel values for SetDefaultPixelValue method of resampler . Defaults to 100.
         visualize (bool, optional): flag to save confrontation. Defaults to False.
-        folder_path (Path, optional): folder path to save image confrontation. Defaults to FrameworkConfig().path_dict['IMG_RESULTS'].
+        folder_path (Path, optional): folder path to save image confrontation. Defaults to _default_save_dir/ 'ImgRes'.
         name (str, optional): name image. Defaults to 'A01_sitk'.
 
     Returns:

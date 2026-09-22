@@ -2,7 +2,7 @@
 from typing import Literal
 from pathlib import Path
 import yaml
-
+import sys
 
 from Main_Folder.Modules.utils import get_root_path, concatenate_paths, deep_update
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
@@ -146,7 +146,9 @@ class FrameworkConfig:
         self.yaml_path = yaml_path
         self.priority = priority
         self._config_dict = yaml_config_setup(yaml_path=yaml_path, priority=priority)
+        self.colab_execution = 'google.colab' in sys.modules
 
+        
     def reload_yaml(self):
         new_config=yaml_config_setup(yaml_path=self.yaml_path, 
                                      priority='personal')

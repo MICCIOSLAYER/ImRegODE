@@ -28,10 +28,12 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import itk
 import numpy as np
+import sys
 
 
 standard_log = get_logger(__name__)
 _fwc_dict = FrameworkConfig()
+_default_save_dir = _fwc_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else _fwc_dict.path_dict['RESULTS'] 
 
 
 
@@ -1157,10 +1159,10 @@ def run_registration_pipeline(
                 saving_format = config_dict['SAVING_FORMAT']
                 results_path = config_dict['RESULTS']
             else:
-                saving_format, results_path = _fwc_dict.text_dict['SAVING_FORMAT'], _fwc_dict.path_dict['RESULTS']           
+                saving_format, results_path = _fwc_dict.text_dict['SAVING_FORMAT'], _default_save_dir     
         else:
             saving_format = config_dict.text_dict['SAVING_FORMAT']
-            results_path = config_dict.path_dict['RESULTS']
+            results_path = config_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else config_dict.path_dict['RESULTS']
 
         saving_path = collected_results.save_data(filename=None, results_path=results_path, fmt = saving_format)
 

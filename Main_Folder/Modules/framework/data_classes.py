@@ -22,6 +22,7 @@ from PIL import Image as PImage
 _fwc_dict = FrameworkConfig()
 root_path = get_root_path()
 standard_log = get_logger(__name__)
+_default_save_dir = _fwc_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else _fwc_dict.path_dict['RESULTS'] 
 
 class SampleDict(TypedDict):
     '''
@@ -332,7 +333,7 @@ class Registration_Data_Collector:
     def save_data(self, 
                   filename: Optional[str],
                   fmt : Literal['csv', 'json', 'excel', 'xls', 'xlsx', 'pkl', 'pickle'] = 'pkl',
-                  results_path :str | Path = _fwc_dict.path_dict['RESULTS'] ,
+                  results_path :str | Path = _default_save_dir ,
                   overwrite: bool = False,
                   IN_COLAB: bool = 'google.colab' in sys.modules,
                   )->Path:
