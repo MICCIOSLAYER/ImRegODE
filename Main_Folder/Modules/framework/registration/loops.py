@@ -236,7 +236,7 @@ def pyramid_loss(sample_dict: SampleDict,
         torch.Tensor: loss calcula
     '''
     total_loss = torch.tensor(0.0)
-    levels = len(sample_dict['test_pyramid'])
+    levels = _fwc_dict.registrations['DRMINE_original']['pyramid']['gaussina_levels'] #len(xy_lst)
     test_pyramid_lst = sample_dict['test_pyramid']
     reference_pyramid_lst = sample_dict['reference_pyramid']
 
