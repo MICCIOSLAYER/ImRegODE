@@ -37,7 +37,7 @@ def unnormalize_matrix(H: torch.Tensor,
     normalized_affine_matrix = H.cpu().detach()
     h, w = image_shape
     if transformation_map is None:
-        N_map = get_coords_normalization_map(height=h, width=w, data_type= H.dtype, device=H.device)
+        N_map = get_coords_normalization_map(height=h, width=w, data_type= H.dtype, device='cpu')
     N_inv_map = torch.linalg.inv(N_map)
 
     unnormalized_affine_matrix = N_inv_map @ normalized_affine_matrix @ N_map
@@ -61,7 +61,7 @@ def decrop_matrix(H: torch.Tensor,
     ty, tx = offset_y0x0
     transformation_map_full_to_crop = torch.tensor([[1, 0, -tx], 
                                                     [0, 1, -ty], 
-                                                    [0, 0, 1]], dtype=H.dtype, device=H.device)
+                                                    [0, 0, 1]], dtype=H.dtype, device='cpu')
     C = transformation_map_full_to_crop # NOTE useful for verbose pourpose
 
     C_inv = torch.linalg.inv(transformation_map_full_to_crop)
