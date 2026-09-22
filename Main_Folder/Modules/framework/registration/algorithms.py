@@ -5,7 +5,7 @@ from Main_Folder.Modules.framework.registration.methods import initialize_networ
 import Main_Folder.Modules.framework.registration.networks 
 from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict, has_required_keys
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
-from Main_Folder.Modules.framework.registration.loops import multi_resolution_loss
+from Main_Folder.Modules.framework.registration.loops import pyramid_loss
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 from Main_Folder.Modules.framework.postprocessing import get_affine_matrix_from_sitk_transform
@@ -870,7 +870,7 @@ def wrapper_drmine_registration_loop(
         parameter_for_registration: dict = None , # output of extract_registration_param
         model_nets : Optional[dict]= None,
         
-        loss_fn : Callable[..., Union[float, Sequence[float]]]=multi_resolution_loss,
+        loss_fn : Callable[..., Union[float, Sequence[float]]]=pyramid_loss,
         network_classes : Optional[dict[str, type[nn.Module]]] = None,
         network_initialization_params : dict = None,
         early_stopping: bool = False,
