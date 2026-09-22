@@ -240,7 +240,11 @@ def pyramid_loss(sample_dict: SampleDict,
     test_pyramid_lst = sample_dict['test_pyramid']
     reference_pyramid_lst = sample_dict['reference_pyramid']
 
- 
+    standard_log.debug(f'levels: {levels}')
+    standard_log.debug(f'test_pyramid_lst levels: {len(test_pyramid_lst)}')
+    standard_log.debug(f'reference_pyramid_lst levels: {len(reference_pyramid_lst)}')
+    standard_log.debug(f'xy_lst len: {len(xy_lst)}')
+    standard_log.debug(f'ind_lst: {len(ind_lst)}')
     
     for level in np.arange(levels-1, -1, -1):
         if sample_dict['nChannel']>1:
