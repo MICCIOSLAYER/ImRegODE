@@ -947,8 +947,8 @@ def wrapper_drmine_registration_loop(
                                                                  config_dict=config_dict,
                                                                  device=device)
         
-    I_lst = parameter_for_registration['reference_lst']
-    J_lst = parameter_for_registration['test_lst']
+    sample_dict['reference_pyramid'] = parameter_for_registration['reference_lst']
+    sample_dict['test_pyramid'] = parameter_for_registration['test_lst']
     xy_lst = parameter_for_registration['xy_lst']
     ind_lst = parameter_for_registration['ind_lst']
 
