@@ -934,7 +934,7 @@ def wrapper_drmine_registration_loop(
     counter_patience = 0
     best_loss= -float(np.inf)
     if progression_bar:
-        pbar= tqdm(range(iterations), desc='DRMINE registration')
+        pbar= tqdm(range(iterations), desc=f'DRMINE registration of {sample_dict['sample_name']}')
     else:
         pbar = range(iterations)
 
