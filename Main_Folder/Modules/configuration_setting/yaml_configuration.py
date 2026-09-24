@@ -106,13 +106,13 @@ def yaml_config_setup(yaml_path: Path,
                                                 'HIGHEDGE_BOX': 7.5/9.0,}}
                         }
     if not yaml_path.exists():
-        standard_log.info(f'the file {yaml_path.stem} does not exist, a new one is created with default configuration')
+        standard_log.warning(f'the file {yaml_path.stem} does not exist, a new one is created with default configuration')
 
         with open(yaml_path, 'w') as f:
             yaml.safe_dump(default_config, f)
         return default_config
     else:
-        standard_log.info(f' opening the file {yaml_path.stem} to downloading the dict')
+        standard_log.debug(f' opening the file {yaml_path.stem} to downloading the dict')
         with open(yaml_path, 'r') as f:
             config = yaml.safe_load(f) or {}
         if priority == 'personal':

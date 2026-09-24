@@ -136,7 +136,7 @@ def naed_evaluation(image_couple_name: str,
     
     if n == 4:
         total_distance = np.nan # NOTE the 3D case has yet to be treated
-        standard_log.info('the 3D case has yet to be treated')
+        standard_log.warning('the 3D case has yet to be treated')
         return total_distance
     
     elif n == 3:

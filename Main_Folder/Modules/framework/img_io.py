@@ -45,7 +45,7 @@ def get_dataset(
 
     # Create the destination folder if it does not exist
     if destination_path.exists():
-        standard_log.info(f'The {destination_path} folder already exists')
+        standard_log.debug(f'The {destination_path} folder already exists')
     else:
         os.makedirs(destination_path, exist_ok=True)
 
@@ -55,12 +55,12 @@ def get_dataset(
     for _, folders, _ in os.walk(destination_path): # FIXME to adjust, control better
         for fold in folders:
             if dataset_name.upper() == fold.upper():
-                standard_log.info(f'The {dataset_name} dataset is already extracted in the {destination_path} folder\nNo need to extract it again')
+                standard_log.debug(f'The {dataset_name} dataset is already extracted in the {destination_path} folder\nNo need to extract it again')
                 return None
 
     # Download and save the dataset from the given url
     if dataset_file.exists():
-        standard_log.info(f'{dataset_name} already exists, no need to download it again')
+        standard_log.debug(f'{dataset_name} already exists, no need to download it again')
     else:
         zip_request = requests.get(dataset_url)
         with open(dataset_file, 'wb') as f:
@@ -158,7 +158,7 @@ def organize_fire_dataset_framework_for_project():
     if not Path(fire_images_path/ 'Reference' ).exists():
         organize_folder(parent_folder=fire_images_path, categories=ref_test_categories, folder_names=ref_test_type)
     else:
-        standard_log.info(f'the folder {fire_images_path} has been already organized')
+        standard_log.debug(f'the folder {fire_images_path} has been already organized')
 
     distrorsion_type = ['Longitudinal_Studies', 'Mosaicing', 'Super_Resolution']
     distorsion_categories = ['A', 'P', 'S']
@@ -169,7 +169,7 @@ def organize_fire_dataset_framework_for_project():
         if not Path(ref_test_image_path / 'Mosaicing').exists():
             organize_folder(parent_folder=ref_test_image_path, categories=distorsion_categories, folder_names=distrorsion_type)
         else: 
-            standard_log.info(f'the folder {ref_test_image_path} already organized')
+            standard_log.debug(f'the folder {ref_test_image_path} already organized')
         
 
 

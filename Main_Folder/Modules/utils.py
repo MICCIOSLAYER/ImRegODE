@@ -248,7 +248,7 @@ def get_saving_name(format : ExtensionType,
         return_path= Path(save_path) 
         saving_name = Path(saving_name).name
     elif save_path.is_dir() and not saving_name:
-        standard_log.info(f'since no name is used it will be assigned the datetime in fomrat: {date_time_name}')
+        standard_log.debug(f'since no name is used it will be assigned the datetime in fomrat: {date_time_name}')
         return Path(save_path) / Path(f'{date_time_name}').with_suffix(f'{extension}')
     elif not save_path.is_dir():
         if save_path.parent.is_dir() and save_path.parent != Path('.'):
@@ -262,7 +262,7 @@ def get_saving_name(format : ExtensionType,
     
     saving_file_path = Path(return_path) / Path(saving_name).with_suffix(f"{extension}")
     if not overwrite and  saving_file_path.exists():
-        standard_log.info(f'since the {saving_file_path} is an existitng one, due to avoid overwriting a new one is selected')
+        standard_log.debug(f'since the {saving_file_path} is an existitng one, due to avoid overwriting a new one is selected')
         saving_file_path = Path(return_path) / Path(f'{date_time_name}_{saving_file_path.stem}').with_suffix(extension)
         
 
@@ -364,7 +364,7 @@ def has_required_keys(input_dict:dict,
     '''
     missed_keys = set(required_keys) - set(input_dict.keys())
     if missed_keys:
-        standard_log.warning(f'The input dictionary is missing required keys: {missed_keys}')
+        standard_log.debug(f'The input dictionary is missing required keys: {missed_keys}')
         return False
 
     return True
@@ -396,7 +396,7 @@ def permute_channel_layout(
     image = image.squeeze()
 
     if image.ndim <= 2:
-        standard_log.info('the image is a grayscale, no need to permute it')
+        standard_log.debug('the image is a grayscale, no need to permute it')
         return image
 
     if image.ndim != 3:
@@ -432,15 +432,15 @@ def permute_channel_layout(
             )
 
     if current_format == target_format:
-        standard_log.info(f'the image shape {image.shape} is already in the format {target_format}')
+        standard_log.debug(f'the image shape {image.shape} is already in the format {target_format}')
         return image
 
     if current_format == "**C" and target_format == "C**":
-        standard_log.info(f'the image shape {image.shape} will be transposed in the format {target_format}')
+        standard_log.debug(f'the image shape {image.shape} will be transposed in the format {target_format}')
         return image.permute(2, 0, 1)
 
     if current_format == "C**" and target_format == "**C":
-        standard_log.info(f'the image shape {image.shape} will be transposed in the format {target_format}')
+        standard_log.debug(f'the image shape {image.shape} will be transposed in the format {target_format}')
         return image.permute(1, 2, 0)
 
     raise ValueError(f"Unsupported target_format: {target_format}")
@@ -601,7 +601,7 @@ def get_tensor(input: Any,
     elif isinstance(input, torch.Tensor):
         return input
     else:
-        standard_log.warning(f'the data type {type(input)} is yet to be handled, introduce a new block to us it correctly')
+        standard_log.error(f'the data type {type(input)} is yet to be handled, introduce a new block to us it correctly')
         raise TypeError(f'Unsupported Type{ type(input)}')
 
 
@@ -636,7 +636,7 @@ def image_to_numpy(image : Image_Type
     elif isinstance(image, Path):
         return np.asarray(PImage.open(image))
     elif isinstance(image, np.ndarray):
-        standard_log.info('the image type is already a np.ndarray, so it\'returned as it is')
+        standard_log.debug('the image type is already a np.ndarray, so it\'returned as it is')
         return image
     else:
         standard_log.error(f'unable to convert since: f{type(image)} is yet to be handled')

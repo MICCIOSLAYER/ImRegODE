@@ -71,7 +71,7 @@ def extract_registration_params(sample_dict : SampleDict,
     nChannel = sample_dict['nChannel']
     
     if not (0.0 < sampling <= 1.0) :
-        standard_log.error(f' the sampling ratio must be equal up to 1.0, so {sampling} will be set to 0.1 as default')
+        standard_log.warning(f' the sampling ratio must be equal up to 1.0, so {sampling} will be set to 0.1 as default')
         sampling = 0.1
 
     reference_lst, test_lst, heights_lst, widths_lst, xy_lst, ind_lst=[],[],[],[],[],[] #one feature for each level of the pyramid

@@ -220,7 +220,7 @@ class MINE_INSIDE(nn.Module): # unravel the functioning of the net
             z2 = self.fc3(z2_second)
             #z1 = self.fc3(F.relu(self.fc2(F.relu(self.fc1(x[ind,:])))))
             #z2 = self.fc3(F.relu(self.fc2(F.relu(self.fc1(torch.cat((x[ind,0:self.nChannel],x[ind_perm,self.nChannel:2*self.nChannel]),1))))))
-            self.logs.info(f'''x[ind,0:self.nChannel] shape : {x[ind,0:self.nChannel].shape},
+            self.logs.debug(f'''x[ind,0:self.nChannel] shape : {x[ind,0:self.nChannel].shape},
                 x[ind_perm,self.nChannel:2*self.nChannel]shape : {x[ind_perm,self.nChannel:2*self.nChannel].shape},
                 the input_shape is : {x[ind,:].shape},
                 after the first layer the output shape is : {z2_first.shape},

@@ -204,7 +204,7 @@ class ImageRegistrationCustom(Dataset):
         test_image = test_images[index]
         reference_image = reference_images[index]
         test_reference,deformation, filename = get_dirs_of(test_image)
-        self.logs.info(f'the selected/chosen image is {filename}, from {deformation} folder of {test_reference}')
+        self.logs.debug(f'the selected/chosen image is {filename}, from {deformation} folder of {test_reference}')
         if self.transform:
             reference_image = self.transform(PImage.open(reference_image))  
         if self.target_transform:

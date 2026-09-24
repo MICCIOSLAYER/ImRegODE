@@ -72,7 +72,7 @@ def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
             test_path=test_path[0]
         if isinstance(reference_path, (tuple, list)):
             reference_path = reference_path[0] 
-        standard_log.info(f'preprocessing sample shape: {test_image.shape}, {reference_image.shape}')
+        standard_log.debug(f'preprocessing sample shape: {test_image.shape}, {reference_image.shape}')
         preprocessed_sample = {
             'reference_sample': reference_image,
             'test_sample': test_image,
@@ -84,8 +84,8 @@ def general_preprocessing(sample_dict: Union[SampleDict, Sequence],
         for transformation in transformations:
             preprocessed_sample = transformation(preprocessed_sample, config_dict)
     else: 
-        standard_log.info('since no trasformation required and the data input is the output of a dataset, the transformation will consist in sorting elements')
-    standard_log.info(f'reference/test image sample shape: {preprocessed_sample["reference_sample"].shape}')
+        standard_log.debug('since no trasformation required and the data input is the output of a dataset, the transformation will consist in sorting elements')
+    standard_log.debug(f'reference/test image sample shape: {preprocessed_sample["reference_sample"].shape}')
     return preprocessed_sample
 
 
@@ -499,7 +499,7 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
             
             channel_axis = torch.argmin(torch.tensor(fixed_image.shape)).item()
             nChannel = fixed_image.shape[channel_axis]
-            standard_log.info(f'the number of channels in the images is: {nChannel}')
+            standard_log.debug(f'the number of channels in the images is: {nChannel}')
             pyramid_fixed = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(fixed_image, sigma=gaussian_sigma, channel_axis=channel_axis), downscale=downscale, channel_axis=channel_axis)) # NOTE multichannel = True?
             pyramid_moving = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(moving_image, sigma=gaussian_sigma, channel_axis=channel_axis), downscale=downscale, channel_axis=channel_axis)) # NOTE multichannel = True?
         elif np.ndim(fixed_image) == 2:
@@ -507,7 +507,7 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
             pyramid_fixed = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(fixed_image, sigma=gaussian_sigma, channel_axis=None), downscale=downscale)) # NOTE multichannel = False?
             pyramid_moving = tuple(torch.from_numpy(pyr) for pyr in pyramid_gaussian(gaussian(moving_image, sigma=gaussian_sigma, channel_axis=None), downscale=downscale)) # NOTE multichannel = False?
         else:
-            standard_log.warning(f"Unknown rank for an image: {np.ndim(fixed_image)}")
+            standard_log.critical(f"Unknown rank for an image: {np.ndim(fixed_image)}")
 
     sample_dict['reference_pyramid'] = pyramid_fixed
     sample_dict['test_pyramid'] = pyramid_moving
@@ -552,7 +552,7 @@ def get_mask_from_image_intensity(img : Any,
             mask = (input_tensor < low_bound) | (input_tensor > high_bound)
         
     if (low_bound == -torch.inf) and ( high_bound==torch.inf):
-        standard_log.info('the image mask correspond to the original image, since all values are included in -np.inf and np.inf')
+        standard_log.debug('the image mask correspond to the original image, since all values are included in -np.inf and np.inf')
         return input_tensor
     else:
         return mask

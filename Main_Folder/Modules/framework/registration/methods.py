@@ -78,7 +78,7 @@ def get_model_param_groups(model: nn.Module,
                     continue
                 param_groups.append({'params': [params_dict[name]], 'lr': lr_val})
             if not param_groups:
-                standard_log.error(f'No valid parameters found in the provided lr dictionary: {list(lr.keys())}')
+                standard_log.critical(f'No valid parameters found in the provided lr dictionary: {list(lr.keys())}')
             return param_groups
 
 
