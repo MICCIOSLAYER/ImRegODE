@@ -3,7 +3,7 @@
 from typing import Sequence, Callable, Optional, Union, Any, Tuple
 from Main_Folder.Modules.framework.registration.methods import initialize_networks, initialize_optimizer
 import Main_Folder.Modules.framework.registration.networks 
-from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict, has_required_keys
+from Main_Folder.Modules.utils import block_time, concatenate_paths, get_flatten_dict, has_required_keys, cuda_memory
 from Main_Folder.Modules.framework.metrics import metric_outputs_update
 from Main_Folder.Modules.framework.registration.loops import pyramid_loss
 from Main_Folder.Modules.framework.data_classes import SampleDict, Registration_Data_Collector
@@ -716,7 +716,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
 
             loss_history = []            # per tracciare tutto
 
-            standard_log.warning("Staring registration with EarlyStopping-mode")
+            standard_log.debug("Staring registration with EarlyStopping-mode")
 
             for iteration in range(num_iterations):
                 
@@ -734,13 +734,13 @@ def airlab_mi_registration  (reference_image: AirlabImage,
                     patience_counter = 0
                     # Salva lo stato attuale dei parametri (è sicuro, non fa deepcopy profondo)
                     best_state = airlab_transformation.state_dict().copy()  # .copy() shallow è ok per dict di tensor leaf
-                    standard_log.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (best)")
+                    standard_log.debug(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (best)")
                 else:
                     patience_counter += 1
-                    standard_log.warning(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (worse)")
+                    standard_log.debug(f"Iter {iteration+1:4d} | Loss: {current_loss:.6f}  (worse)")
                     
                     if patience_counter >= patience:
-                        standard_log.warning(f"Early stopping activated after {iteration+1} iteration (patience={patience})")
+                        standard_log.info(f"Early stopping activated after {iteration+1} iteration (patience={patience})")
                         # Ripristina lo stato migliore
                         if best_state is not None:
                             airlab_transformation.load_state_dict(best_state)
@@ -763,7 +763,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
                                
     registration_state_dict = {'time_taken' : airlab_time_taken,
                                'airlab_transformation': airlab_transformation,
-                               'registrations_data' : airlab_state_dict,
+                               'registrations_data' : airlab_state_dict, # FIXME exclude this data to avoid memory loss?
                                'H_matrix': H.detach().cpu().numpy(),
                                'loss_history': airlab_registration.lossHistory,
                                'device': device,}
@@ -1064,9 +1064,10 @@ def results_collection(
     if max_sample is not None and 0 < max_sample <= len(dataloader):
         data_iterator = islice(data_iterator, max_sample)
     for sample_set in tqdm(data_iterator,total=max_sample, desc='REGISTRATION IN WORK'):
+        standard_log.info(f'{cuda_memory('START')}')
         preprocessed_sample_dict = preprocessing_fn(sample_dict=sample_set, config_dict=config_dict)
         registration_results = registration_fn(preprocessed_sample_dict, config_dict=config_dict)
-
+        standard_log.info(f'{cuda_memory('AFTER REGISTRATION')}')
         if not any('naed' in k.lower() for k in registration_results.keys()):
 
             coords_norm = {'image_normalization': 'coords_norm', 'name_to_use': 'naed_coords'}
@@ -1089,7 +1090,7 @@ def results_collection(
                                         registration_data = registration_results,
                                         registration_name = registration_name
                                         )    
-
+        standard_log.info(f'{cuda_memory('AFTER COLLECTOR')}')
     return collector
     
 
