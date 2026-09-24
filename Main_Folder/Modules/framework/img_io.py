@@ -3,7 +3,7 @@ from typing import Union, Optional
 import SimpleITK as sitk
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
-from Main_Folder.Modules.utils import tensor_img_rgb2bn, permute_channel_layout, get_root_path
+from Main_Folder.Modules.utils import tensor_img_rgb2bn, permute_channel_layout, get_root_path, has_required_keys
 import torch
 from airlab.utils.image import Image as AirlabImage
 
@@ -16,6 +16,7 @@ import numpy as np
 from pathlib import Path
 
 standard_log = get_logger(__name__)
+_fwc_dict = FrameworkConfig()
 
 def get_dataset(
         dataset_url: str,
@@ -175,7 +176,7 @@ def organize_fire_dataset_framework_for_project():
 
 #                                      =============     AIRLAB    ==================
 
-def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict)-> AirlabImage:
+def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict | FrameworkConfig = _fwc_dict)-> AirlabImage:
     '''
     Read an image producing the airlabImage type
 
@@ -186,11 +187,19 @@ def airlab_read_image(image: Union[Path, torch.Tensor], config_dict:dict)-> Airl
     Returns:
         AirlabImage: _description_
     '''
+    req_ks= ['img_normalization']
+    if isinstance(config_dict, dict):
+            if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+                text_dict = config_dict
+            else:
+                text_dict = _fwc_dict.text_dict
+    else:
+        text_dict= config_dict.text_dict
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if isinstance(image, Path):
         image_airlab= AirlabImage.read(image, dtype=torch.float32, device=device)
     else: # if isinstance(fixed_image, torch.Tensor) or isinstance(fixed_image, np.ndarray): # tensor type (1, 1, H, W) or (1, C, H, W)
-        ref_image=tensor_img_rgb2bn(image, normalization_type=config_dict['constant']['text-like']['img_normalization'])
+        ref_image=tensor_img_rgb2bn(image, normalization_type=text_dict['img_normalization'])
         sitk_input = ref_image.cpu() if torch.is_tensor(ref_image) and ref_image.is_cuda else ref_image
         image_airlab = AirlabImage(
             tensor_img_to_sitk(sitk_input),
