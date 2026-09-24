@@ -1166,18 +1166,20 @@ def run_registration_pipeline(
     )
     saving_path = None
     if save_results:
-        saving_ks = ['SAVING_FORMAT', 'RESULTS']
-        if isinstance(config_dict, dict):
-            if has_required_keys(input_dict=config_dict, required_keys=saving_ks):
-                saving_format = config_dict['SAVING_FORMAT']
-                results_path = config_dict['RESULTS']
+        try:
+            saving_ks = ['SAVING_FORMAT', 'RESULTS']
+            if isinstance(config_dict, dict):
+                if has_required_keys(input_dict=config_dict, required_keys=saving_ks):
+                    saving_format = config_dict['SAVING_FORMAT']
+                    results_path = config_dict['RESULTS']
+                else:
+                    saving_format, results_path = _fwc_dict.text_dict['SAVING_FORMAT'], _default_save_dir     
             else:
-                saving_format, results_path = _fwc_dict.text_dict['SAVING_FORMAT'], _default_save_dir     
-        else:
-            saving_format = config_dict.text_dict['SAVING_FORMAT']
-            results_path = config_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else config_dict.path_dict['RESULTS']
-        
-        filename = pipeline_kwargs.get('filename', None) 
-        saving_path = collected_results.save_data(filename=filename, results_path=results_path, fmt = saving_format)
-
+                saving_format = config_dict.text_dict['SAVING_FORMAT']
+                results_path = config_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else config_dict.path_dict['RESULTS']
+            
+            filename = pipeline_kwargs.get('filename', None) 
+            saving_path = collected_results.save_data(filename=filename, results_path=results_path, fmt = saving_format)
+        except Exception as e:
+            standard_log.error(f'saving failed due to:\n{e}')
     return (collected_results, saving_path)
