@@ -700,7 +700,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
         )
     
     with block_time() as registration_time:
-        airlab_registration = PairwiseRegistration()
+        airlab_registration = PairwiseRegistration(verbose=False)
         airlab_registration.set_optimizer(airlab_optimizer)
         airlab_registration.set_number_of_iterations(num_iterations)
         airlab_registration.set_transformation(airlab_transformation)
