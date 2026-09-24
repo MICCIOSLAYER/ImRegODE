@@ -530,7 +530,7 @@ def cuda_memory(label: str
         label (str): _description_
     '''
     if torch.cuda.is_available():
-        standard_log.debug(
+        standard_log.info(
             f"{label}: "
             f"allocated={torch.cuda.memory_allocated() / 1024**3:.3f} GB | "
             f"reserved={torch.cuda.memory_reserved() / 1024**3:.3f} GB"
