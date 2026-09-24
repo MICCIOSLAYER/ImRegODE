@@ -168,7 +168,27 @@ class FrameworkConfig:
 
     @property
     def path_dict(self):
-        #aggiungi la versione colab da qui
+        if self.colab_execution:
+            colab_path_dict = self._config_dict['constant']['path-like'].copy()
+
+            colab_path_dict['FIRE_DATASET'] = colab_path_dict['DRIVE_FIRE']
+            colab_path_dict['CONTROL_POINTS_FOLDER'] = colab_path_dict['FIRE_DATASET'] / 'Groung Truth'
+            colab_path_dict['IMAGES'] = colab_path_dict['FIRE_DATASET '] / 'Images'
+            colab_path_dict['IMAGE_MASK'] = colab_path_dict['FIRE_DATASET'] / 'Mask'
+            colab_path_dict['FIRE_REFERENCE_FOLDER'] = colab_path_dict['IMAGES'] / 'Reference'
+            colab_path_dict['FIRE_TEST_FOLDER'] = colab_path_dict['IMAGES'] / 'Test'
+            # NOTE no need to convert Image_A/S/P since no
+
+
+            colab_path_dict['RESULTS'] = colab_path_dict['DRIVE_RESULTS']
+            colab_path_dict['IMG_RESULTS'] = colab_path_dict['RESULTS'] / 'ImgRes'
+            colab_path_dict['DATA_COLLECTORS'] = colab_path_dict['RESULTS'] / 'DataCollectors'
+            colab_path_dict['CSV_RESULTS'] =colab_path_dict['RESULTS'] / 'CSVResults'
+            colab_path_dict['ELASTIX_IMAGE_FOLDER'] = colab_path_dict['RESULTS'] / 'ITK-Elastix'
+            
+            
+
+
         return self._config_dict['constant']['path-like']
 
 

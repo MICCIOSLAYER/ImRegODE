@@ -476,9 +476,21 @@ class Registration_Data_Collector:
                         )
                         collector.collection = df.to_dict(orient='index')
                         collector.registration_name = filepath.stem
+        
         except Exception as e:
-            cls.logs.error(f'the {e} exception occurred')
-            payload = {}
+            print(f'the {e} exception occurred\nTry to load trought torch.load')
+            try:
+                payload = torch.load(
+                    f=filepath,
+                    pickle_module=pickle,
+                    weights_only=False,
+                    map_location=torch.device('cpu')
+                    )
+            except Exception as e2:
+                print(f'{e2}\tunable to open the file')
+                payload = {}
+
+
         if isinstance(payload, cls):
             print('loading the file using old configuration')
             return payload
