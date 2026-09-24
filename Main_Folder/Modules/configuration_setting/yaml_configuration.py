@@ -173,7 +173,7 @@ class FrameworkConfig:
 
             colab_path_dict['FIRE_DATASET'] = colab_path_dict['DRIVE_FIRE']
             colab_path_dict['CONTROL_POINTS_FOLDER'] = colab_path_dict['FIRE_DATASET'] / 'Groung Truth'
-            colab_path_dict['IMAGES'] = colab_path_dict['FIRE_DATASET '] / 'Images'
+            colab_path_dict['IMAGES'] = colab_path_dict['FIRE_DATASET'] / 'Images'
             colab_path_dict['IMAGE_MASK'] = colab_path_dict['FIRE_DATASET'] / 'Mask'
             colab_path_dict['FIRE_REFERENCE_FOLDER'] = colab_path_dict['IMAGES'] / 'Reference'
             colab_path_dict['FIRE_TEST_FOLDER'] = colab_path_dict['IMAGES'] / 'Test'
