@@ -829,12 +829,12 @@ def airlab_wrapper_for_registration(sample_dict:SampleDict,
         registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
                                                    reference_mask = airlab_reference_mask,
                                                    test_mask=airlab_test_mask,
-                                                   moved_image=airlab_test_image,
+                                                   test_image=airlab_test_image,
                                                    config_dict=config_dict,
                                                    )
     else:
         registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
-                                                   moved_image=airlab_test_image,
+                                                   test_image=airlab_test_image,
                                                    config_dict=config_dict,
                                                    )
     if show_difference:
