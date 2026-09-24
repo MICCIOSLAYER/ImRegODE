@@ -654,11 +654,11 @@ def airlab_mi_registration  (reference_image: AirlabImage,
             else:
                 airlab_config_dict = _fwc_dict.registrations['airlab']
     else:
-        airlab_config_dict= config_dict.registrations['airlab']
+        airlab_config_dict= config_dict.registrations['airlab'] 
     
     
 
-    
+
     metric_num_bins = airlab_config_dict['histo_bins']
     metric_sigma = airlab_config_dict['metric_sigma']
     spatial_sampling = airlab_config_dict['sampling_ratio']
