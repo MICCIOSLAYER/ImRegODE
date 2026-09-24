@@ -857,7 +857,8 @@ def airlab_wrapper_for_registration(sample_dict:SampleDict,
     
     registration_data['naed_diagonal'] = naed_diagonal
     registration_data['naed_coords'] = naed_norm_coord
-    registration_data['affine_matrix'] = registration_data['H_matrix'].detach().cpu().numpy()
+    if isinstance(registration_data['affine_matrix'], torch.Tensor):
+        registration_data['affine_matrix'] = registration_data['H_matrix'].detach().cpu().numpy()
 
 
 
