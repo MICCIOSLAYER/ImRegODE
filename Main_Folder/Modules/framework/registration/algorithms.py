@@ -586,103 +586,15 @@ def elastix_registration(reference_image: itk.Image,
 
 #                                    =================================
 #                                            AIRLAB REGISTRATION
-#                                    =================================
-
-#-------------------------------------------WRAPPER-------------------------------------------
-
-def airlab_wrapprer_for_registration(sample_dict:SampleDict,
-                                     config_dict:dict | FrameworkConfig,
-                                     airlab_registration_fn: Callable[[AirlabImage, AirlabImage, dict], dict],
-                                     show_difference : bool = False,
-                                     saving_path : Path = None
-                                     )-> dict:
-    '''
-    Wrapper forfor airlab registration loop -type it uniform registration loops to take the same inputs and give out the results 
-    as a dict to be easily put in Data Collector
-
-    Args:
-        sample_dict (SampleDict): Dictionary containing main information about samples
-        config_dict (dict, FrameworkConfig): configuration dictionary containing all the parameters for the registration
-            if a dict mandatory to have the following keys: 'masked' with a bool value
-                                                            also see the registrationfn in the standard it has to have
-        airlab_registration_fn (_type_): registration function following specs of airlab
-    Required Keys
-    ------------
-    'masked', if present it should contains parameter for the mask built
-    Returns:
-        dict: registration results of airlab_registration_fn
-    '''
-    req_ks = ['masked']
-    if isinstance(config_dict, dict):
-        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
-            airlab_config_dict = config_dict
-        else:
-            airlab_config_dict = _fwc_dict.registrations['airlab']
-    else:
-        airlab_config_dict= config_dict.registrations['airlab']
-
-    
-    #===========READ IMAGES============
-    if 'reference_sample_path' in sample_dict:
-        airlab_reference_image = airlab_read_image(sample_dict['reference_sample_path'])
-    elif 'reference_sample' in sample_dict:
-        airlab_reference_image = airlab_read_image(sample_dict['reference_sample'])
-
-    if 'test_sample_path' in sample_dict:
-        airlab_test_image = airlab_read_image(sample_dict['test_sample_path'])
-    elif 'test_sample' in sample_dict:
-        airlab_test_image = airlab_read_image(sample_dict['test_sample'])
-    
-    if airlab_config_dict['masked']:
-
-        airlab_reference_mask, airlab_test_mask = airlab_mask_configuration(reference_image_airlab=airlab_reference_image,
-                                                                test_image_airlab=airlab_test_image,
-                                                                config_dict=config_dict)
-        
-        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
-                                                   reference_mask = airlab_reference_mask,
-                                                   test_mask=airlab_test_mask,
-                                                   moved_image=airlab_test_image,
-                                                   config_dict=config_dict,
-                                                   )
-    else:
-        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
-                                                   moved_image=airlab_test_image,
-                                                   config_dict=config_dict,
-                                                   )
-    if show_difference:
-        airlab_show_image_differencies(
-            test_image=airlab_test_image,
-            reference_image=airlab_reference_image,
-            airlab_transformation=registration_data['airlab_transformation'],
-            save_images = saving_path,
-            airlab_dict=config_dict, #NOTE control why airlab_config_dcit instead of the config_dict
-        )
-
-
-    image_name_couple = sample_dict['sample_name']
-    naed_diagonal = naed_evaluation(image_couple_name=image_name_couple,
-                                affine_matrix=registration_data['H_matrix'],
-                                image_normalization='diagonal')
-    naed_norm_coord = naed_evaluation(image_couple_name=image_name_couple,
-                                affine_matrix=registration_data['H_matrix'],
-                                image_normalization='coords_norm')
-    
-    registration_data['naed_diagonal'] = naed_diagonal
-    registration_data['naed_coords'] = naed_norm_coord
-    registration_data['affine_matrix'] = registration_data['H_matrix'].detach().cpu().numpy()
-
-
-
-    
-    return registration_data
+#
+#                                     =================================
 
 
 
 #-------------------------------------------REGISTRATION FNS-------------------------------------------
 def airlab_mi_registration  (reference_image: AirlabImage,
                             test_image: AirlabImage,
-                            config_dict:dict | FrameworkConfig,
+                            config_dict:dict | FrameworkConfig=_fwc_dict,
                             reference_mask: Optional[AirlabImage] = None,
                             test_mask: Optional[AirlabImage] = None,
                             device: Optional[torch.device] = None,
@@ -731,7 +643,11 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     #============DEVICE SELECTION============
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    req_keys=['histo_bins', 'metric_sigma','sampling_ratio','lr','n_iterations', 'early-stopping']
+    if EarlyStopping:
+        req_keys=['histo_bins', 'metric_sigma','sampling_ratio','lr','n_iterations', 'early-stopping']
+    else:
+        req_keys=['histo_bins', 'metric_sigma','sampling_ratio','lr','n_iterations']
+
     if isinstance(config_dict, dict):
             if has_required_keys(input_dict=config_dict, required_keys=req_keys):
                 airlab_config_dict = config_dict
@@ -742,7 +658,7 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     
     
 
-    airlab_config_dict = config_dict['registrations']['airlab']
+    
     metric_num_bins = airlab_config_dict['histo_bins']
     metric_sigma = airlab_config_dict['metric_sigma']
     spatial_sampling = airlab_config_dict['sampling_ratio']
@@ -853,6 +769,100 @@ def airlab_mi_registration  (reference_image: AirlabImage,
                                'device': device,}
                                
     return registration_state_dict
+
+
+
+
+
+#-------------------------------------------WRAPPER-------------------------------------------
+
+def airlab_wrapper_for_registration(sample_dict:SampleDict,
+                                    airlab_registration_fn: Callable[[AirlabImage, AirlabImage, dict], dict]=airlab_mi_registration,
+                                    config_dict:dict | FrameworkConfig=_fwc_dict,
+                                    show_difference : bool = False,
+                                    saving_path : Path = None,
+                                    **airlab_wrapper_kwargs,
+                                    )-> dict:
+    '''
+    Wrapper forfor airlab registration loop -type it uniform registration loops to take the same inputs and give out the results 
+    as a dict to be easily put in Data Collector
+
+    Args:
+        sample_dict (SampleDict): Dictionary containing main information about samples
+        config_dict (dict, FrameworkConfig): configuration dictionary containing all the parameters for the registration
+            if a dict mandatory to have the following keys: 'masked' with a bool value
+                                                            also see the registrationfn in the standard it has to have
+        airlab_registration_fn (_type_): registration function following specs of airlab
+    Required Keys
+    ------------
+    'masked', if present it should contains parameter for the mask built
+    Returns:
+        dict: registration results of airlab_registration_fn
+    '''
+    req_ks = ['masked']
+    if isinstance(config_dict, dict):
+        if has_required_keys(input_dict=config_dict, required_keys=req_ks):
+            airlab_config_dict = config_dict
+        else:
+            airlab_config_dict = _fwc_dict.registrations['airlab']
+    else:
+        airlab_config_dict= config_dict.registrations['airlab']
+
+    
+    #                                           ===========READ IMAGES============
+    if 'reference_sample_path' in sample_dict:
+        airlab_reference_image = airlab_read_image(sample_dict['reference_sample_path'])
+    elif 'reference_sample' in sample_dict:
+        airlab_reference_image = airlab_read_image(sample_dict['reference_sample'])
+
+    if 'test_sample_path' in sample_dict:
+        airlab_test_image = airlab_read_image(sample_dict['test_sample_path'])
+    elif 'test_sample' in sample_dict:
+        airlab_test_image = airlab_read_image(sample_dict['test_sample'])
+    
+    if airlab_config_dict['masked']:
+
+        airlab_reference_mask, airlab_test_mask = airlab_mask_configuration(reference_image_airlab=airlab_reference_image,
+                                                                test_image_airlab=airlab_test_image,
+                                                                config_dict=config_dict)
+        
+        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                   reference_mask = airlab_reference_mask,
+                                                   test_mask=airlab_test_mask,
+                                                   moved_image=airlab_test_image,
+                                                   config_dict=config_dict,
+                                                   )
+    else:
+        registration_data = airlab_registration_fn(reference_image=airlab_reference_image,
+                                                   moved_image=airlab_test_image,
+                                                   config_dict=config_dict,
+                                                   )
+    if show_difference:
+        airlab_show_image_differencies(
+            test_image=airlab_test_image,
+            reference_image=airlab_reference_image,
+            airlab_transformation=registration_data['airlab_transformation'],
+            save_images = saving_path,
+            airlab_dict=config_dict, #NOTE control why airlab_config_dcit instead of the config_dict
+        )
+
+
+    image_name_couple = sample_dict['sample_name']
+    naed_diagonal = naed_evaluation(image_couple_name=image_name_couple,
+                                affine_matrix=registration_data['H_matrix'],
+                                image_normalization='diagonal')
+    naed_norm_coord = naed_evaluation(image_couple_name=image_name_couple,
+                                affine_matrix=registration_data['H_matrix'],
+                                image_normalization='coords_norm')
+    
+    registration_data['naed_diagonal'] = naed_diagonal
+    registration_data['naed_coords'] = naed_norm_coord
+    registration_data['affine_matrix'] = registration_data['H_matrix'].detach().cpu().numpy()
+
+
+
+    
+    return registration_data
 
 
 
@@ -1089,9 +1099,9 @@ def results_collection(
 #                                           ==========================
 
 
-PreprocessingFn = Callable[[SampleDict | Sequence, dict], SampleDict]
+PreprocessingFn = Callable[[SampleDict | Sequence, dict| FrameworkConfig], SampleDict]
 
-RegistrationFn = Callable[[SampleDict, dict], dict]
+RegistrationFn = Callable[[SampleDict, dict | FrameworkConfig ], dict]
 
 DataCollectionFN = Callable[
     [DataLoader, # dataloader
@@ -1105,11 +1115,11 @@ DataCollectionFN = Callable[
 
 def run_registration_pipeline(
 
-        registration_fn : Callable[[SampleDict, dict | FrameworkConfig ], dict], # to typize
+        registration_fn :RegistrationFn, # to typize
         dataset : Optional[Dataset] = None, #optional
         dataloader : Optional[DataLoader] = None, # depending on the previous
         config_dict : dict | FrameworkConfig =_fwc_dict,
-        preprocessing_fn : Callable[[SampleDict, dict| FrameworkConfig], SampleDict] = general_preprocessing,
+        preprocessing_fn : PreprocessingFn = general_preprocessing,
         data_collection_fn : DataCollectionFN = results_collection,
         save_results: bool = True,
         **pipeline_kwargs
@@ -1163,7 +1173,8 @@ def run_registration_pipeline(
         else:
             saving_format = config_dict.text_dict['SAVING_FORMAT']
             results_path = config_dict.path_dict['DRIVE_RESULTS'] if 'google.colab' in sys.modules else config_dict.path_dict['RESULTS']
-
-        saving_path = collected_results.save_data(filename=None, results_path=results_path, fmt = saving_format)
+        
+        filename = pipeline_kwargs.get('filename', None) 
+        saving_path = collected_results.save_data(filename=filename, results_path=results_path, fmt = saving_format)
 
     return (collected_results, saving_path)
