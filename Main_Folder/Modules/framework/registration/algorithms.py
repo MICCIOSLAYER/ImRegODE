@@ -757,13 +757,13 @@ def airlab_mi_registration  (reference_image: AirlabImage,
     #8. return the displacement field and registration state dictionary
     transformation_matrix = airlab_transformation._compute_transformation_matrix() # da sostituire con airlab_transformation.get_transformation_matrix() 
     H=torch.eye(images_dim+1, dtype=torch.float32, device=device)
-    H[:images_dim, :]=transformation_matrix
+    H[:images_dim, :]=transformation_matrix # NOTE per utilizzare la matrice H è necessario denormalizzarla prima di aplicarla ai control points definiti dal ground truth, fai wrapper naed per airlab facendo solo unnormalize matrix
     airlab_state_dict = airlab_registration._transformation.state_dict()
     airlab_state_dict.pop('_grid', None)
                                
     registration_state_dict = {'time_taken' : airlab_time_taken,
-                               'airlab_transformation': airlab_transformation,
-                               'registrations_data' : airlab_state_dict, # FIXME exclude this data to avoid memory loss?
+                               #'airlab_transformation': airlab_transformation, # FIXME exclude this data to avoid oom
+                               'registrations_data' : airlab_state_dict, 
                                'H_matrix': H.detach().cpu().numpy(),
                                'loss_history': airlab_registration.lossHistory,
                                'device': device,}
