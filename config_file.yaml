@@ -9,6 +9,15 @@ constant:
       area_ratio: 0
       final_height: 1941
       final_width: 1941
+    filters:
+      scharr:
+        mode: reflect
+      canny:
+        low_threshold: 0.04
+        high_threshold: 0.08
+        mode : constant
+      laplace:
+        ksize: 3
       
 
   path-like:
