@@ -126,6 +126,14 @@ class SimpleImRegDataSet(Dataset):
             colors=0
         return colors
 
+    def get_mask(self) -> torch.Tensor:
+        '''
+        Get the mask for the dataset images
+        Returns:
+            torch.Tensor: the masked image as tensor
+        '''
+        mask_image = PImage.open(self.dataset_folder_path /'Masks' /'mask.png')
+        return transforms.ToTensor()(mask_image)
 
 
 class ImageRegistrationCustom(Dataset):
