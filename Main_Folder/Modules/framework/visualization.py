@@ -6,14 +6,16 @@ import sys
 import itk
 from airlab.utils import Image as AirlabImage
 from airlab.transformation.utils import warp_image
-
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from PIL import Image as PImage
 from typing import Union, Optional, Sequence, Any
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
+from Main_Folder.Modules.framework.data_classes import Registration_Data_Collector
 from Main_Folder.Modules.framework.preprocessing import rescaling_image
 from Main_Folder.Modules.utils import permute_channel_layout, get_data_time, get_root_path, concatenate_paths, image_to_numpy, has_required_keys
 
@@ -271,3 +273,94 @@ def airlab_show_image_differencies(reference_image: AirlabImage,
         
     
     return saving_path
+
+
+#                                       ==========================
+#                                           PLOT VISUALIZATION 
+#                                       ==========================
+
+
+
+
+def show_box_plot(list_of_data: Sequence[Registration_Data_Collector],
+                  feature_to_confront : str,
+                  **vis_kwarg,
+                  )->None: 
+    '''
+    the function plot a box plot to show differencies in measurements across different methods
+
+    Args:
+        list_of_data (Sequence[Registration_Data_Collector]): list of Registration_Data_Collectorto to get the data to confront
+        feature_to_confront (str): the plot support the confrontation of a single set of measurements for each methods
+    '''
+    x_label = []
+    y_label = feature_to_confront
+    return
+
+
+#                                       ==========================
+#                                           LOSS VISUALIZATION 
+#                                       ==========================
+
+
+
+
+    
+
+
+def plot_single_trace(
+    y: Sequence[float],
+    x: Sequence[float] | None = None,
+    xlabel: str = "Index",
+    ylabel: str = "Value",
+    title: str | None = None,
+    linestyle: str = "-",
+    show_points: bool = False,
+    marker: str = "o",
+    figsize: tuple = (8, 5),
+    grid: bool = True,
+    show: bool = True,
+):
+    """
+    Plot a single trace.
+
+    Args:
+        y: Values to plot.
+        x: X-axis values. Defaults to sequential indices.
+        xlabel: X-axis label.
+        ylabel: Y-axis label.
+        title: Optional plot title.
+        linestyle: Line style ('-', '--', '-.', ':', 'None').
+        show_points: Whether to display data points.
+        marker: Marker style ('o', 'x', 's', '.', etc.).
+        figsize: Figure dimensions.
+        grid: Whether to display the grid.
+        show: Whether to display the figure.
+
+    Returns:
+        tuple: (fig, ax) Matplotlib figure and axes.
+    """
+    if x is None:
+        x = range(len(y))
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.plot(
+        x,
+        y,
+        linestyle=linestyle,
+        marker=marker if show_points else None,
+    )
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if title is not None:
+        ax.set_title(title)
+
+    ax.grid(grid)
+
+    if show:
+        plt.show()
+
+    return fig, ax
