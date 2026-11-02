@@ -18,6 +18,7 @@ _fwc_dict = FrameworkConfig()
 def extract_registration_params(sample_dict : SampleDict,
                         config_dict: dict |FrameworkConfig,
                         true_random_index: bool = False,
+                        mask: torch.Tensor | None = None,
                         device : torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                         ) -> dict[str, Any]:
     '''
@@ -28,6 +29,8 @@ def extract_registration_params(sample_dict : SampleDict,
     ------------
     sample_dict (SampleDict): the dict containing all information about the sample useful for registration loop
     config_dict (dict): the dict representing the yaml configuration file
+    true_random_index (bool): whether to use a truly random index for sampling
+    mask (torch.Tensor | None): a mask to apply to the sampling
     device (torch.device): to put the tensor on the correct device during execution and calcula
 
     Required Keys
@@ -52,7 +55,8 @@ def extract_registration_params(sample_dict : SampleDict,
     # ======== GET VALS from CONFIG_DICT=============
 
     req_ks =['sampling_ratio', 'pyramid']
-        
+    if mask is None:
+        mask = torch.ones(sample_dict['reference_pyramid'][0].shape, dtype=torch.bool, device=device)
 
     if isinstance(config_dict, dict):
         if has_required_keys(input_dict=config_dict, required_keys=req_ks) and has_required_keys(input_dict=config_dict['pyramid'], required_keys=['gaussian_levels']):
@@ -87,6 +91,9 @@ def extract_registration_params(sample_dict : SampleDict,
             height_, width_ = reference_lst[s].shape[1], reference_lst[s].shape[2]
             if true_random_index:
                 ind_= torch.randperm(int(height_*width_), device=device)[:int(height_*width_*sampling)] 
+                if s == 0:
+                    ind_mask = torch.nonzero(mask.flatten() != 0, as_tuple=True)[0]
+                    ind_ = ind_mask[torch.randperm(len(ind_mask), device=device)[:int(len(ind_mask)*sampling)]]
             else:
                 ind_ = torch.randperm(int(height_*width_*sampling), device=device) # FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
             ind_lst.append(ind_)
@@ -96,6 +103,9 @@ def extract_registration_params(sample_dict : SampleDict,
             height_, width_ = reference_lst[s].shape[0], reference_lst[s].shape[1]
             if true_random_index:
                 ind_= torch.randperm(int(height_*width_), device=device)[:int(height_*width_*sampling)] 
+                if s == 0:
+                    ind_mask = torch.nonzero(mask.flatten() != 0, as_tuple=True)[0]
+                    ind_ = ind_mask[torch.randperm(len(ind_mask), device=device)[:int(len(ind_mask)*sampling)]]
             else:
                 ind_ = torch.randperm(int(height_*width_*sampling), device=device)# FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
             ind_lst.append(ind_)
