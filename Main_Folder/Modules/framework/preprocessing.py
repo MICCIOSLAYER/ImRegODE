@@ -5,21 +5,22 @@ from Main_Folder.Modules.utils import permute_channel_layout
 from Main_Folder.Modules.framework.data_classes import SampleDict
 from Main_Folder.Modules.utils import image_to_numpy
 from Main_Folder.Modules.configuration_setting.logger_configuration import get_logger
-from Main_Folder.Modules.utils import get_tensor, image_to_numpy, has_required_keys
+from Main_Folder.Modules.utils import get_tensor, image_to_numpy, has_required_keys, tensor_img_rgb2bn
 from Main_Folder.Modules.configuration_setting.yaml_configuration import FrameworkConfig
 import torch
 import SimpleITK as sitk
 import numpy as np
 import cv2
 from skimage.transform import pyramid_gaussian
-from skimage.filters import gaussian
+from skimage.filters import gaussian, scharr, laplace
+from skimage.feature import canny
 import itk
 from itertools import islice
 from airlab.utils.image import Image as AirlabImage # NOTE consider to move airlab from TESI_MAGISTRALE to another folder
 from pathlib import Path
 import logging
 from fractions import Fraction
-image_type = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
+ImageType = Union[torch.Tensor, itk.Image, sitk.Image, AirlabImage]
 #---------------------
 #REGISTRATION PIPELINE
 #---------------------
@@ -318,7 +319,7 @@ def crop_image_advance(
             original_image=original_image.unsqueeze(0)
 
     
-    
+ 
     # NOTE to be used on image after taken by dataset/dataloader in shape (1, C, H, W)
 
     
@@ -405,11 +406,34 @@ def crop_image_advance(
     }
     return crop_dict, cropped_image
 
+def get_cm_coords (input_image : ImageType,
+                   threshold : float= 0.5,
+                   ) -> tuple[int, int]:
+    '''
+    from a 2D image in gray scale defining the threshold define the concentration of 'information' about image feature variation, 
+    it get the CoM of the image features as previously defined
+
+    Args:
+        input_image (ImageType): the image in a gray scale format [H,W], whose CoM has to be evaluate
+        threshold (float, optional): the threshold to set to binaryze the image. Defaults to 0.5.
+
+    Returns:
+        tuple[int, int]: the coordinates of the CoM in the input_image
+    '''
+
+    image = tensor_img_rgb2bn(imgrgb=get_tensor(input_image))
+
+    binarized_image = (image > threshold).float()
+    non_null_coords = torch.nonzero(binarized_image, as_tuple=True)
+    standard_log.debug(f'non_null_coords: {len(non_null_coords[0])}')
+    centre_of_mass = [torch.round(coord_i.float().mean()) for coord_i in non_null_coords]
+    return tuple(centre_of_mass)
+
 
 # ==============
 # NORMALIZE FN
 # ==============
-def normalize_img (image : image_type | torch.Tensor,
+def normalize_img (image : ImageType | torch.Tensor,
                    normalization_interval: tuple[int,int] = (0,1)
                    )-> torch.Tensor | np.ndarray:
     '''
@@ -420,7 +444,7 @@ def normalize_img (image : image_type | torch.Tensor,
 
 
     Args:
-        image (image_type | torch.Tensor): input image to normalize
+        image (ImageType | torch.Tensor): input image to normalize
         normalization_interval (tuple[int,int], optional): the final min and max of the image values. Defaults to (0,1).
 
     Returns:
@@ -518,6 +542,38 @@ def coupled_gaussian_pyramid(sample_dict: SampleDict,
 #==================
 #MASK IMAGES
 #==================
+
+def get_edge_images (input_image:ImageType,
+                     filter_selection: Literal['scharr', 'laplace', 'canny'] = 'canny',
+                     mask :  np.ndarray =None,
+                     specifics_dict : dict | FrameworkConfig = None
+                     )-> np.ndarray:
+    '''
+    generate the image of edge repecting the choosen filter
+
+    Args:
+        input_image (ImageType): image whose edge are to be extract
+        filter_selection (Literal['scharr', 'laplace', 'canny'], optional): define the type of filter to be used. Defaults to 'canny'. Tested interval is [0.04, 0.08]
+        mask (np.ndarray, optional): define the delimitation of the region to be considered. Defaults to None.
+        specifics_dict (dict | FrameworkConfig, optional): the dict to use for filter specifics. Defaults to None.
+            in case of a dict, use {f'filter_selection' : {filter_specifics_dict}} to define the filter specifics, otherwise the default from FrameworkConfig will be used
+    Returns:
+        np.ndarray: the image of the edges of the input image
+    '''
+    image_to_filter = image_to_numpy(tensor_img_rgb2bn(input_image, normalization_type= 'same'))
+    if  specifics_dict is None: 
+        specifics_dict = fwc_dict.num_dict['filters'][filter_selection]
+    else: 
+        specifics_dict = specifics_dict[filter_selection]
+    if filter_selection == 'scharr':
+        filtred_image = scharr(image_to_filter) #, **specifics_dict, mask = mask)
+    elif filter_selection == 'laplace':
+        filtred_image = np.abs(laplace(image_to_filter, **specifics_dict, mask = mask))
+    elif filter_selection == 'canny':
+        filtred_image = canny(image_to_filter, **specifics_dict, mask = mask).astype(np.float32)
+
+    return filtred_image
+
 
 
 def get_mask_from_image_intensity(img : Any,
