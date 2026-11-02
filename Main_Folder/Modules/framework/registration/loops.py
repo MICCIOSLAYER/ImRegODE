@@ -17,7 +17,7 @@ _fwc_dict = FrameworkConfig()
 
 def extract_registration_params(sample_dict : SampleDict,
                         config_dict: dict |FrameworkConfig,
-                        
+                        true_random_index: bool = False,
                         device : torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                         ) -> dict[str, Any]:
     '''
@@ -85,13 +85,19 @@ def extract_registration_params(sample_dict : SampleDict,
             reference_lst.append(permute_channel_layout(image=ref_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
             test_lst.append(permute_channel_layout(image=tst_, target_format = 'C**')) # permute (H,W, C) -> (C, H, W)
             height_, width_ = reference_lst[s].shape[1], reference_lst[s].shape[2]
-            ind_ = torch.randperm(int(height_*width_*sampling), device=device) # FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
+            if true_random_index:
+                ind_= torch.randperm(int(height_*width_), device=device)[:int(height_*width_*sampling)] 
+            else:
+                ind_ = torch.randperm(int(height_*width_*sampling), device=device) # FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
             ind_lst.append(ind_)
         else:
             reference_lst.append(ref_)
             test_lst.append(tst_)
             height_, width_ = reference_lst[s].shape[0], reference_lst[s].shape[1]
-            ind_ = torch.randperm(int(height_*width_*sampling), device=device)# FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
+            if true_random_index:
+                ind_= torch.randperm(int(height_*width_), device=device)[:int(height_*width_*sampling)] 
+            else:
+                ind_ = torch.randperm(int(height_*width_*sampling), device=device)# FIXME usa sempre lo stesso bacino di pixel ( il primo 10%), se volessi renderlo davvero randomico dovrei usare ind_ = torch.randperm(int(h_*w_))[:int(h_*w_*sampling)] 
             ind_lst.append(ind_)
         heights_lst.append(height_)
         widths_lst.append(width_)
